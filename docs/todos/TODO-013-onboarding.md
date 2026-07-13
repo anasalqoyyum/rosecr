@@ -1,4 +1,4 @@
-# TODO-013 Add onboarding flow for first-run setup and asset download
+# TODO-013 Add checksum-verified onboarding and one-shot validation
 
 ## Tags
 
@@ -6,7 +6,7 @@
 - `vertical-slice`
 - `prd:desktop-ocr-translator-prd`
 - `onboarding`
-- `installer`
+- `assets`
 
 ## Parent PRD
 
@@ -14,24 +14,30 @@
 
 ## What to build
 
-Create a first-run onboarding flow that downloads required OCR assets, lets the user choose a target language and provider path, and gets them to a working default setup. This slice should make the product usable by someone who did not participate in development.
+Create a first-run flow that explains privacy, installs verified OCR assets, signs in to Codex, selects model, reasoning, direction, game, and scope, then proves the setup with one one-shot translation while leaving Auto off.
 
 ## Acceptance criteria
 
-- [ ] A fresh app run can enter a setup flow instead of dropping the user into an unconfigured experience.
-- [ ] The onboarding flow can download required OCR assets or clearly surface download progress and failure.
-- [ ] The flow ends in a working default configuration that allows the user to start reading immediately.
+- [ ] OCR asset downloads show size and version, resume or retry, verify a published checksum, and preserve the previous valid asset set after failure.
+- [ ] Play and Auto stay disabled until required assets, capture permission, target, direction, model, and authentication are ready.
+- [ ] Onboarding covers the complete PRD sequence without exposing deferred providers or inspect features.
+- [ ] The final validation displays a real one-shot translation and exits onboarding with Auto disabled.
+- [ ] Restarting interrupted onboarding resumes safely without erasing an already saved game region or valid assets.
 
 ## Blocked by
 
-- TODO-002
+- TODO-003
 - TODO-011
+- TODO-012
 
 ## User stories addressed
 
 - User story 40
 - User story 41
+- User story 50
+- User story 52
+- User story 62
 
 ## Notes
 
-Keep onboarding short. It should produce a working baseline, not teach every advanced setting.
+Keep advanced OCR controls out of first-run setup. The goal is a verified safe default, not feature education.

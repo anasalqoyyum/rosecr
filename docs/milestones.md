@@ -2,105 +2,119 @@
 
 Parent PRD: `desktop-ocr-translator-prd.md`
 
-Shared PRD tag: `prd:desktop-ocr-translator-prd`
+Shared tag: `prd:desktop-ocr-translator-prd`
 
-## M0 Foundations
+Milestones are ordered by risk and demoable value. A todo is complete only when its acceptance criteria and relevant tests pass.
 
-Goal:
+## M0 Safe Windows Foundation
 
-- Establish the Electron shell, Python sidecar contract, settings persistence, and a working capture entry point.
-
-Slices:
-
-- `TODO-001` Bootstrap app shell with utility bar and settings persistence
-- `TODO-002` Launch bundled Python sidecar and show OCR health in the app
-- `TODO-003` Select a screen region and preview capture updates
-
-Exit criteria:
-
-- The app launches on Windows
-- Utility bar and settings window are usable
-- OCR sidecar supervision works
-- Region capture is selectable and previewable
-
-## M1 First End-to-End Translation
-
-Goal:
-
-- Deliver the first demoable screen-to-translation overlay loop.
+Goal: prove the desktop and capture assumptions before building the translation pipeline.
 
 Slices:
 
-- `TODO-004` Run OCR on the selected region and render source-aligned debug boxes
-- `TODO-005` Translate changed OCR text through one provider and render overlay text
+- `TODO-001` Bootstrap the safe utility shell and runtime controls
+- `TODO-002` Prove the Windows game-capture and overlay contract
 
 Exit criteria:
 
-- A selected screen region can be OCR'd
-- OCR results map to overlay boxes
-- At least one provider translates changed text into visible overlay output
+- Rosecr launches on Windows 11 x64 with Play, Auto, Overlay, Clear, direction, scope, and settings controls.
+- Auto starts disabled and does not restore active state.
+- A chosen window can be captured without capturing Rosecr.
+- Passive overlays are click-through, non-focusable, and do not disturb game focus.
+- The capture spike records whether Electron alone satisfies the v1 contract or a native helper is required.
 
-## M2 Reading Experience
+## M1 Durable Local OCR Slice
 
-Goal:
-
-- Make the core reading loop efficient, configurable, and useful for more real-world workflows.
+Goal: recognize a saved game region locally and recover cleanly from runtime or target-window failures.
 
 Slices:
 
-- `TODO-006` Add smart idle pause and changed-text deduplication
-- `TODO-007` Support fullscreen and active-window capture from the utility bar
-- `TODO-008` Add performance profiles and advanced scan cadence controls
-- `TODO-009` Add manual inspect mode with focused translation panel
-- `TODO-010` Add mini dictionary cards in inspect mode
-- `TODO-014` Improve overlay theming, opacity, and accessibility controls
-- `TODO-015` Strengthen vertical-text heuristics and reading-order cleanup
+- `TODO-003` Persist a game target and normalized region
+- `TODO-004` Run supervised local OCR into aligned debug overlays
 
 Exit criteria:
 
-- Realtime mode avoids unnecessary OCR and translation work
-- All three scopes are supported
-- Users can inspect text manually
-- Overlay readability and Japanese handling are improved beyond the baseline demo
+- A game and client-relative region can be selected, previewed, persisted, and reattached.
+- The bundled Python sidecar communicates over typed stdio and restarts at most once after a crash.
+- `owocr` returns positioned horizontal and vertical boxes with confidence.
+- OCR debug overlays stay aligned across movement, resizing, and DPI changes.
 
-## M3 Providers and Onboarding
+## M2 First Codex Translation
 
-Goal:
-
-- Make provider setup, privacy controls, and first-run experience usable by other testers.
+Goal: complete the first real one-shot game translation through the user's Codex subscription.
 
 Slices:
 
-- `TODO-011` Add provider settings with OpenAI BYOK and connection test
-- `TODO-012` Add local/cloud provider switching and explicit routing UI
-- `TODO-013` Add onboarding flow for first-run setup and asset download
+- `TODO-005` Deliver Codex OAuth one-shot translation overlays
+- `TODO-011` Add Codex model, reasoning, account, and error controls
 
 Exit criteria:
 
-- Users can configure supported providers from the UI
-- Cloud routing is explicit
-- A fresh install can reach a working state through onboarding
+- The user can sign in through the pinned `pi-ai` adapter without API billing credentials.
+- Play translates eligible Japanese or English boxes once and displays only completed validated output.
+- Target-language and non-linguistic regions remain untouched.
+- Model or auth failure never destroys capture configuration or silently switches models.
 
-## M4 Packaging and External Testing
+## M3 Realtime Translation Quality
 
-Goal:
-
-- Produce a Windows build that feels like one app and can be tested outside the dev environment.
+Goal: make Auto reliable, context-aware, and resistant to progressively revealed or stale text.
 
 Slices:
 
-- `TODO-016` Package Windows installer with bundled runtime and recoverable diagnostics
+- `TODO-006` Add Auto, text tracking, and stale-result protection
+- `TODO-009` Add structured batching, bounded context, glossary, and cache
+- `TODO-015` Strengthen Japanese orientation, cleanup, and direction gating
 
 Exit criteria:
 
-- The app installs through a Windows-first packaging flow
-- Bundled runtime and asset download experience are workable
-- Common startup or provider failures are surfaced clearly
+- Auto begins without Play and remains disabled after a fresh app start.
+- Incomplete dialogue retriggers correctly and stale results never commit.
+- Low-confidence text and missed boxes follow the two-scan rules.
+- Multi-box screens translate in visual order with bounded context and cache.
+- Kiseki-style mixed-language fixtures preserve existing target-language UI.
 
-## Deferred After V1 Baseline
+## M4 Capture and Overlay Productization
 
-- Stylized game text optimization beyond baseline OCR cleanup
-- Dense manga layout reconstruction
-- Persistent history or transcripts
-- macOS support
-- Linux support
+Goal: support the intended game modes and produce readable collision-free replacement overlays.
+
+Slices:
+
+- `TODO-007` Add durable whole-game-window capture and display recovery
+- `TODO-008` Add performance profiles and scan cadence controls
+- `TODO-010` Add source replacement and collision-aware layout
+- `TODO-014` Add overlay customization, accessibility, and shortcuts
+
+Exit criteria:
+
+- Region and whole-game-window capture work in windowed and borderless-fullscreen games.
+- Capture survives target movement, resizing, mixed DPI, monitor changes, and temporary loss.
+- Overlay boxes never overlap or silently truncate; dense layouts use the callout fallback.
+- Fast, Balanced, and Accurate profiles affect the real pipeline.
+- Balanced meets the documented reference latency and idle-resource targets.
+
+## M5 Privacy, Onboarding, and Release
+
+Goal: make a fresh installation safe, understandable, and measurable against the v1 gate.
+
+Slices:
+
+- `TODO-012` Add privacy-safe diagnostics and model-input hardening
+- `TODO-013` Add checksum-verified onboarding and one-shot validation
+- `TODO-016` Package Windows x64 and execute the v1 release gate
+
+Exit criteria:
+
+- Default logs and exports contain no screenshots, user text, prompts, responses, or secrets.
+- OCR text cannot alter the fixed translation task or enable tools.
+- Asset downloads resume, verify checksums, and preserve the last valid version.
+- Onboarding ends with a successful one-shot translation and Auto off.
+- The packaged app passes every release criterion in the PRD on the documented reference system.
+
+## Deferred After V1
+
+- `TODO-017` Add manual inspect mode
+- `TODO-018` Add dictionary cards to inspect mode
+- `TODO-019` Add offline CAT-Translate
+- `TODO-020` Add DeepL, Google Translate, and OpenAI-compatible BYOK
+
+Deferred todos are not blockers for `TODO-016` or the v1 release gate.

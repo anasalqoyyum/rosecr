@@ -1,446 +1,341 @@
 # Technical Architecture
 
-This document maps the PRD and UI direction to a concrete runtime architecture for a Windows-first Electron application with a Python OCR sidecar.
+This document maps `desktop-ocr-translator-prd.md` to an implementation-ready Windows architecture. The PRD is authoritative.
 
-## Goals
+## Architectural Goals
 
-- Keep the user-facing app lightweight
-- Run OCR locally through Python
-- Keep translation providers replaceable
-- Support realtime overlay and manual inspect modes
-- Avoid unnecessary OCR and translation work when the screen is unchanged
+- Keep the game-facing experience lightweight and non-invasive.
+- Run capture analysis and OCR locally; send only eligible extracted text to Codex.
+- Guarantee that stale translation work cannot overwrite newer game text.
+- Keep capture, OCR, translation, tracking, and overlay layout independently testable.
+- Preserve capture configuration across failures and restarts.
+- Leave stable provider and OCR boundaries for post-v1 extensions without implementing them early.
+
+## V1 Boundaries
+
+- Primary platform: Windows 11 x64
+- Capture: selected region within a chosen game or the whole chosen game window
+- Game modes: windowed and borderless fullscreen
+- Languages: Japanese to English and English to Japanese
+- OCR: bundled Python runtime and `owocr`
+- Translation: Codex subscription OAuth through pinned `@earendil-works/pi-ai`
+- Overlay: click-through source replacement
+
+Rosecr does not inject code, read game memory, install text hooks, patch executables, capture the whole desktop, or support exclusive fullscreen in v1.
 
 ## Runtime Shape
 
-The app is split into two main runtimes:
+Rosecr has two runtimes:
 
 1. Electron desktop application
-2. Python sidecar service
+2. Bundled Python OCR sidecar
 
-Electron owns windows, settings, overlay rendering, hotkeys, auth UX, and desktop integration.
+Electron owns orchestration, capture, windows, state, translation, auth, secure storage, settings, diagnostics, and overlay composition.
 
-Python owns OCR-specific image preprocessing, `owocr` execution, text box extraction, orientation handling, and Japanese reading heuristics.
+Python owns image preprocessing, `owocr`, OCR confidence and geometry, orientation, and Japanese reading-order cleanup.
 
-## Process Model
+Renderer processes never communicate directly with Python, credentials, or the model provider.
 
-### Electron Processes
+## Electron Surfaces
 
-- Main process
-- Settings renderer
-- Utility bar renderer
-- Overlay renderer
-- Inspect renderer
+### Utility Bar
 
-### Python Processes
+- Play performs one immediate translation pass.
+- Auto begins continuous change-driven translation without Play.
+- Auto always starts disabled in a new Rosecr process.
+- Overlay visibility is independent from Auto.
+- Clear discards current overlays and one-shot watchers.
+- Direction, scope, model access, status, and settings remain close at hand.
 
-- OCR service process
-- Optional worker subprocesses in the future for OCR isolation or model-specific tasks
+### Settings and Onboarding
 
-## Electron Window Model
+One standard application window hosts first-run setup and settings. It owns capture configuration, Codex sign-in, model and reasoning selection, overlay preferences, shortcuts, diagnostics, and asset management.
 
-### 1. Utility Bar Window
+### Overlay Windows
 
-Purpose:
+Use transparent, non-focusable, click-through windows associated with the target display. They render only view models supplied by the main process. They are excluded from supported capture paths and cannot initiate provider work.
 
-- Lightweight always-available controls
-- Fast mode switching
-- Small status surface
+### Region Selector
 
-Responsibilities:
+A temporary interactive surface selects a rectangle inside the chosen game client area. It stores normalized client-relative coordinates, then closes before capture begins.
 
-- Start or pause capture
-- Toggle overlay mode
-- Toggle auto translation
-- Change active target language
-- Change capture scope
-- Open settings
-- Open inspect mode
+Manual inspect and dictionary windows are post-v1.
 
-Recommended behavior:
-
-- Frameless compact window
-- Always on top when pinned
-- Minimal memory footprint
-
-### 2. Settings Window
-
-Purpose:
-
-- Full configuration surface
-
-Responsibilities:
-
-- General settings
-- Capture settings
-- Translation provider selection
-- OAuth or BYOK flows
-- Overlay theme and layout settings
-- Shortcut configuration
-- Diagnostics and about screen
-
-Recommended behavior:
-
-- Standard app window
-- Single instance
-- Opens from utility bar or tray
-
-### 3. Overlay Window
-
-Purpose:
-
-- Render translated text boxes over the screen content
-
-Responsibilities:
-
-- Render transparent overlay
-- Paint translated box components
-- Handle click-through behavior when passive
-- Accept interaction when inspect mode is active
-
-Recommended behavior:
-
-- Transparent frameless always-on-top window
-- Click-through in passive mode
-- Pointer-enabled in inspect mode
-- One overlay per display is likely simpler than one giant unified surface
-
-### 4. Inspect Panel Window
-
-Purpose:
-
-- Focused translation and dictionary details for a selected OCR region
-
-Responsibilities:
-
-- Show source text
-- Show translated text
-- Show dictionary cards
-- Allow copy or pin actions later if needed
-
-Recommended behavior:
-
-- Small panel window or anchored popover
-- Opens on demand
-- Not always visible
-
-### 5. Region Selector Surface
-
-Purpose:
-
-- Let the user define a screen region or save a preset
-
-Recommended behavior:
-
-- Temporary fullscreen translucent surface
-- Simple drag selection
-- Confirmation controls
-
-## Main Process Responsibilities
-
-The Electron main process should be the orchestration layer.
-
-Responsibilities:
-
-- Launch and supervise the Python sidecar
-- Register global hotkeys
-- Manage window lifecycle
-- Persist settings and profiles
-- Route events between UI renderers and backend services
-- Coordinate capture scheduling
-- Manage secure secret storage
-- Expose a stable IPC API to renderer windows
-
-The main process should avoid containing OCR, translation prompt logic, or view-specific formatting.
-
-## Python Sidecar Responsibilities
-
-The Python sidecar should expose a small, stable service interface.
-
-Responsibilities:
-
-- Accept image frames or crop requests
-- Preprocess images for OCR
-- Run `owocr`
-- Return OCR boxes, text, orientation, and confidence
-- Apply Japanese-aware cleanup heuristics
-- Optionally support batching in the future
-
-The Python sidecar should not own provider auth, overlay rendering, or settings persistence.
-
-## Module Boundaries
+## Main-Process Modules
 
 ### Capture Engine
 
-Lives primarily on the Electron side.
+Responsibilities:
+
+- Capture one explicitly chosen game window.
+- Crop selected regions from that window.
+- Emit physical-pixel frames and timestamps.
+- Perform low-cost frame-difference checks.
+- Recover from target resize, DPI changes, display changes, and device loss.
+- Reject Rosecr-owned windows and invalid or blank frames.
+
+The first implementation slice must prove a window capture path compatible with `Windows.Graphics.Capture` semantics. Electron APIs are preferred when they satisfy the contract; otherwise a thin native Windows helper becomes v1 work.
+
+Rosecr windows use capture exclusion through Electron content protection or the corresponding Windows display-affinity behavior. The Capture Engine also detects recursion rather than relying on exclusion alone.
+
+### Capture Target Manager
 
 Responsibilities:
 
-- Screen capture
-- Region capture
-- Active-window capture
-- Frame hashing or difference detection
-- Scheduling based on active profile and scan interval
+- Persist stable game identity, capture mode, and normalized region.
+- Resolve a returning game to its current window handle.
+- Reattach automatically after temporary window loss.
+- Enter an explicit ambiguity state when multiple windows match.
+- Preserve configuration through all runtime failures.
 
-Interface shape:
+A minimized, closed, protected, or uncapturable game enters `waiting`; it does not emit blank OCR frames.
 
-- `startCapture(scope, profile)`
-- `pauseCapture()`
-- `resumeCapture()`
-- `setScope(scope)`
-- `subscribeToFrames()`
-
-### OCR Service Client
-
-Lives on the Electron main-process side and talks to Python.
+### Sidecar Supervisor
 
 Responsibilities:
 
-- Serialize requests to Python
-- Manage request timeouts
-- Restart sidecar on failure
-- Normalize Python responses into app-level OCR objects
+- Launch the bundled Python process.
+- Exchange length-delimited typed messages over private stdio.
+- Track health and request timeouts.
+- Attempt one automatic restart after an unexpected crash.
+- Stop with an actionable error after repeated failure.
 
-Interface shape:
+V1 exposes no localhost OCR port.
 
-- `runOcr(frameOrRegion)`
-- `getHealth()`
-- `restart()`
+### OCR Service
+
+Input:
+
+- Capture generation
+- Physical-pixel image or crop
+- Requested preprocessing profile
+
+Output per box:
+
+- Box identifier
+- Capture generation
+- Physical-pixel rectangle
+- Normalized text
+- Confidence
+- Horizontal or vertical orientation
+- Reading-order metadata
+
+Low-confidence text must match in a spatially compatible box across two consecutive scans before it becomes translation-eligible. High-confidence text proceeds after the normal debounce.
 
 ### Text Tracking Engine
 
-Lives on the Electron side between OCR and translation.
-
 Responsibilities:
 
-- Compare current OCR output to prior OCR output
-- Create stable tracked text regions
-- Detect unchanged text
-- Decide what needs retranslating
-- Support session cache keys
+- Maintain stable box identity across frames.
+- Assign monotonically increasing source generations.
+- Debounce progressively revealed text.
+- Tolerate one missed OCR scan.
+- Remove a box after two consecutive misses.
+- Mark queued and in-flight results obsolete when source text changes.
+- Feed only stable current boxes to translation.
 
-Interface shape:
+The engine is authoritative for whether a result is current. Provider cancellation is an optimization, not the correctness mechanism.
 
-- `updateTrackedText(ocrResult)`
-- `getChangedSegments()`
-- `getOverlayState()`
+### Direction and Content Gate
+
+The user explicitly selects the direction.
+
+- Japanese-to-English accepts boxes containing Japanese script.
+- English-to-Japanese accepts boxes containing meaningful Latin text.
+- Target-language-only, numeric-only, symbol-only, and non-linguistic boxes bypass translation and receive no overlay.
+- Mixed-language boxes preserve target-language spans when OCR geometry makes that reliable.
+
+No general language detector runs in the realtime path.
 
 ### Translation Router
 
-Lives on the Electron side.
+V1 exposes one provider through a provider-neutral contract.
 
 Responsibilities:
 
-- Route to the active translation provider
-- Apply provider-specific auth and config
-- Cache repeated requests
-- Debounce repeated text updates
-- Enforce explicit cloud routing rules
+- Batch stable changed boxes.
+- Apply timeouts and one transient retry.
+- Maintain context, glossary, and cache.
+- Validate provider results against box and source generations.
+- Map provider failures into stable application errors.
 
-Provider adapters:
+Batch limits:
 
-- OpenAI-compatible adapter
-- DeepL adapter
-- Google Translate adapter
-- Local MT adapter
+- At most eight boxes
+- Approximately 2,000 source characters
+- At most two in-flight batches
+- Split in visual reading order
+- Prioritize current visible dialogue
 
-Interface shape:
+Completed batch items commit independently. A batch is cancelled only when every item is obsolete.
 
-- `translate(segments, context, providerConfig)`
-- `testProvider(providerConfig)`
-- `listProviders()`
+### Codex Provider Adapter
+
+The adapter wraps an exact reviewed version of `@earendil-works/pi-ai` and uses only its provider, OAuth, credential-store, model-discovery, transport, and streaming capabilities.
+
+Responsibilities:
+
+- Drive browser or device-code OAuth from the main process.
+- Store credentials through an injected OS-protected store.
+- Discover account-supported models and reasoning efforts.
+- Submit translation-only requests with no tools.
+- Buffer streaming tokens internally.
+- Support cancellation and stable session reuse.
+
+Partial tokens never reach an overlay. A result is accepted only after successful completion, structured-output validation, and generation validation.
+
+OCR text, dialogue context, and glossary entries are untrusted data. They are delimited from fixed instructions and cannot change the task or enable tools.
+
+Rosecr never imports Codex CLI credentials and never treats Codex OAuth as an OpenAI Platform API key.
+
+### Session Context and Cache
+
+Context contains the five latest completed current-generation source-and-translation units in visual order.
+
+The advisory terminology glossary:
+
+- Holds at most 100 source-target mappings.
+- Accepts candidates only from completed stable translations.
+- Requires a conflicting mapping to recur before replacing an established mapping.
+- Lives only for the active game session.
+
+The translation cache:
+
+- Is an in-memory 500-entry LRU.
+- Keys normalized source, direction, model, reasoning, prompt version, and context/glossary fingerprint.
+- Clears on game change, sign-out, and application exit.
 
 ### Overlay Compositor
 
-Lives across the main process and overlay renderer.
-
 Responsibilities:
 
-- Convert tracked translations into overlay view models
-- Position text boxes
-- Apply theme and layout rules
-- Handle show, hide, fade, and update states
+- Convert accepted translations into immutable overlay view models.
+- Obscure source text with a current blurred crop or safe plate.
+- Place all visible translations as one collision-aware layout.
+- Track normal, updating, waiting, and error presentation.
 
-Interface shape:
+Collision order:
 
-- `renderOverlay(items)`
-- `setVisibility(state)`
-- `setTheme(theme)`
+1. Preserve anchor and wrap.
+2. Shrink to the configured readable minimum, initially 12 DIP.
+3. Expand into unoccupied non-text space.
+4. Reposition while preserving source association.
+5. Use an edge callout with a leader line.
 
-### Inspect and Dictionary Module
+The compositor never silently truncates or overlaps translations.
 
-Lives across overlay renderer and inspect panel.
-
-Responsibilities:
-
-- Select text region
-- Open inspect view
-- Request token-level dictionary data
-- Present source and translation cleanly
-
-Interface shape:
-
-- `openInspect(regionId)`
-- `loadDictionaryCards(text)`
+While an update is pending, the previous matching translation remains dimmed. A failed update removes any translation belonging to an older source generation and reveals the current source.
 
 ### Settings and Profile Module
 
-Responsibilities:
+Persists:
 
-- Persist app settings
-- Persist hotkeys
-- Persist capture presets
-- Persist profile definitions
-- Publish settings changes to active services
+- Game identity and normalized capture presets
+- Direction
+- Model and reasoning choice
+- Fast, Balanced, or Accurate profile
+- Overlay theme, opacity, font, outline, and density
+- Global shortcuts
 
-Profiles should at minimum include:
+Does not persist active Auto. Startup always enters idle with Auto off.
 
-- Fast
-- Balanced
-- Accurate
+Initial profile defaults:
+
+- Fast: about 150 ms capture cadence and 200 ms debounce
+- Balanced: 250 ms and 300 ms
+- Accurate: 500 ms and 500 ms with stronger preprocessing
 
 ### Auth and Secret Module
 
-Responsibilities:
+- Owns Codex sign-in and sign-out.
+- Supplies the protected credential store to `pi-ai`.
+- Keeps raw OAuth material in the main process.
+- Exposes only non-secret account state to renderers.
+- Clears provider sessions, context, and cache on sign-out.
 
-- Store BYOK secrets securely
-- Manage OAuth sign-in flows
-- Refresh tokens if required
-- Expose provider credentials safely to the translation router
+### Diagnostics Module
 
-## IPC and Service Boundaries
+Default logs contain timestamps, versions, state transitions, durations, counts, and redacted error codes.
 
-Renderer windows should not talk directly to Python.
+They exclude screenshots, OCR text, translations, prompts, raw responses, authorization headers, and credentials. Support export includes text or images only through separate unchecked consent controls with a preview.
 
-Recommended boundary:
+## Control State Machine
 
-- Renderer windows talk to Electron main process through typed IPC
-- Electron main talks to Python sidecar through a private local transport
+### Idle
 
-Possible local transport options:
+- Saved configuration is loaded.
+- Auto is off.
+- No OCR or provider work occurs.
 
-1. HTTP on localhost
-2. WebSocket on localhost
-3. stdio-based child process messaging
+### One-shot Running
 
-Recommended v1 choice:
+- Play captures, OCRs, gates, translates, and lays out the current frame once.
+- After completion, only local frame-difference watchers remain over translated source regions.
+- A changed source clears its overlay without OCR or Codex.
 
-- stdio or a tightly scoped localhost service
+### Auto Running
 
-Reasoning:
+- Continuous capture and change-driven OCR are active.
+- Unchanged content produces no provider calls.
+- Play forces an immediate refresh without creating another loop.
 
-- Simpler packaging
-- Easier process supervision
-- Less surface area than a broad local API server
+### Waiting
 
-## Data Flow
+- The target or a required runtime is temporarily unavailable.
+- Configuration is retained and the user sees the cause.
+- Temporary game-window loss may resume automatically.
 
-The core realtime flow should look like this:
+### Error
 
-```text
-Capture Engine
-  -> frame difference check
-  -> OCR Service Client
-  -> Python OCR Service
-  -> OCR result
-  -> Text Tracking Engine
-  -> changed segments only
-  -> Translation Router
-  -> translated segments
-  -> Overlay Compositor
-  -> Overlay Window
-```
+- A non-recoverable auth, provider, capture, or sidecar failure has occurred.
+- Pending work is cancelled and stale results cannot commit.
+- Recovery is explicit and does not erase capture setup.
 
-Manual inspect flow:
+Disabling Auto transitions to idle, cancels pending work, and leaves completed overlays under local source-change watching. Hiding overlays changes visibility only; it does not change Auto state.
 
-```text
-User selects overlay region
-  -> Inspect Module
-  -> load source text + translation
-  -> optional dictionary lookup
-  -> Inspect Panel Window
-```
+## Scheduling and Failure Rules
 
-## Realtime Scheduling Model
+1. Capture cadence samples the target.
+2. Frame difference decides whether OCR is needed.
+3. OCR confidence and two-scan rules decide eligibility.
+4. A roughly 300 ms Balanced debounce handles progressive text.
+5. Stable changed boxes are batched.
+6. Provider results are buffered and validated.
+7. The compositor atomically commits current results.
 
-The scheduling model should be layered.
+Transient translation failures receive one retry after about 750 ms or a short provider-supplied delay. Authentication, exhausted allowance, invalid requests, cancellation, unavailable models, and obsolete generations are not retried.
 
-1. Capture interval controls how often the app samples frames
-2. Frame-difference detection decides whether OCR should run
-3. OCR text-difference detection decides whether translation should run
-4. Provider debouncing and caching decide whether a provider call is needed
+## Geometry and Color
 
-This means `scan interval` is user-facing, but translation remains content-driven.
+- Physical pixels are canonical inside capture, OCR, and tracking.
+- Persisted regions use normalized client coordinates.
+- Renderer boundaries convert to device-independent coordinates.
+- DPI, monitor, client-size, and display-topology changes invalidate visible geometry until a fresh frame is processed.
+- HDR or advanced-color frames are normalized to SDR before OCR and frame comparison.
 
-## State Model
+## Packaging and Assets
 
-High-level app state:
+The Windows installer bundles Electron, the Python runtime, sidecar code, provider adapter, and redistributable fonts. Large OCR assets may download during onboarding.
 
-- Active scope
-- Active profile
-- Active provider
-- Active target language
-- Overlay visibility state
-- Auto mode on or off
-- Inspect mode on or off
-- Sidecar health
-- Provider health
+Asset downloads show size and version, support resume, verify checksums before activation, and retain the previous valid asset set after failure.
 
-Per-region overlay state:
+## Security Invariants
 
-- OCR box geometry
-- Source text
-- Translation text
-- Confidence
-- Last updated timestamp
-- Stable region identifier
-- Visibility status
+- No game injection, hooks, memory reads, patching, or automated elevation
+- No screenshots sent to Codex
+- No renderer access to OAuth tokens
+- No localhost OCR service in v1
+- No model tools
+- No captured-text instructions executed
+- No Rosecr windows accepted as capture targets
+- No active Auto restored at startup
 
-## Packaging Model
+## Deferred Extensions
 
-Recommended Windows-first packaging:
-
-- Electron installer bundles app shell
-- Embedded Python runtime bundled with app
-- OCR assets downloaded on first run or setup
-- Provider SDKs included selectively based on licensing and size
-
-The user experience should still feel like one app even though it launches multiple internal processes.
-
-## Reliability Strategy
-
-The app should tolerate failure in isolated modules.
-
-Examples:
-
-- If OCR sidecar crashes, main process restarts it and surfaces status
-- If provider auth expires, overlay pauses cloud translation and shows a recoverable warning
-- If overlay renderer fails, it can be recreated without losing all app state
-
-## Security and Privacy Model
-
-- OCR happens locally by default
-- Screenshots are not sent to cloud providers in v1
-- Only extracted text is eligible for cloud translation
-- Cloud routing must be explicit and visible in the UI
-- Session text history is ephemeral by default
-- Secrets should use OS-secure storage when available
-
-## Future Extension Points
-
-- Native Windows helper for lower-latency capture
-- More advanced Japanese layout reconstruction
-- Additional dictionary engines
-- Additional AI providers through the OpenAI-compatible interface
-- macOS and Linux capture backends
-- Richer overlay placement heuristics for dense manga pages
-
-## Suggested Implementation Sequence
-
-1. Utility bar and settings shell
-2. Python sidecar supervision and OCR contract
-3. Basic region capture
-4. OCR to overlay pipeline
-5. Translation router with one provider
-6. Smart idle pause and text tracking
-7. Inspect panel and dictionary cards
-8. Profiles, presets, and advanced settings
+- Manual inspect and dictionary cards
+- CAT-Translate offline provider
+- DeepL, Google Translate, and OpenAI-compatible BYOK
+- Additional languages
+- Exclusive fullscreen or whole-desktop capture
+- macOS, Linux, Windows on ARM, and 32-bit Windows
+- Heavy manga or document reconstruction

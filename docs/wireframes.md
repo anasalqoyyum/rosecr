@@ -1,294 +1,264 @@
 # Low-Fidelity Wireframes
 
-This document turns the PRD and UI direction into concrete screen shapes and flows.
+These wireframes describe v1 surfaces and behavior. They intentionally omit deferred inspect, dictionary, history, and multi-provider UI.
 
-## Design Principles
+## Design Rules
 
-- Stay compact
-- Keep the main controls visible and understandable
-- Make the overlay the product, not the settings window
-- Support both passive realtime reading and manual inspect flow
-- Avoid requiring the user to manage multiple heavy windows
+- The utility bar is the fastest path to every frequent action.
+- Play means one-shot translation; Auto means continuous translation.
+- Auto always starts off.
+- Passive overlays never receive input or focus.
+- Settings remain shallow and compact.
+- Translation appears only after the complete result is ready.
 
-## Primary Surfaces
+## V1 Surfaces
 
-The product should have five core surfaces:
-
-1. Setup and onboarding window
-2. Main utility bar or mini controller
-3. Settings window
-4. Overlay translation layer
-5. Manual inspect and dictionary surface
-
-## 1. Setup and Onboarding Window
-
-Purpose:
-
-- Download OCR assets
-- Select target language
-- Choose translation provider
-- Configure auth
-- Explain overlay permissions and capture modes
-
-Suggested layout:
-
-```text
-+-----------------------------------------------------------+
-| Rosecr Setup                                         [X] |
-+-----------------------------------------------------------+
-| Step 1 of 4                                             |
-|                                                           |
-| Download OCR assets                                       |
-| [#####################.............]  62%                |
-|                                                           |
-| Target language                                           |
-| [ English v ]                                             |
-|                                                           |
-| Translation provider                                      |
-| [ OpenAI ] [ DeepL ] [ Google ] [ Local ]                |
-|                                                           |
-| Auth                                                      |
-| ( ) Sign in with provider                                 |
-| (x) Use API key                                           |
-| [______________________________]                          |
-|                                                           |
-|                    [ Back ] [ Continue ]                  |
-+-----------------------------------------------------------+
-```
-
-Notes:
-
-- This should be simple and linear.
-- Do not expose advanced OCR controls here.
-- The first-run path should end with a working default profile.
-
-## 2. Main Utility Bar or Mini Controller
-
-Purpose:
-
-- Provide immediate access to mode toggles
-- Keep the app feeling lightweight
-- Offer quick status without opening the full settings app
-
-Suggested layout:
-
-```text
-+-----------------------------------------------------------------------------------+
-| [Start]  JP -> EN  Provider: OpenAI  Overlay: On  Auto: On  Scope: Region  [..] |
-+-----------------------------------------------------------------------------------+
-```
-
-Expanded variant:
-
-```text
-+--------------------------------------------------------------------------------------------------+
-| [Play/Pause] | JP -> EN | Provider | Overlay | Auto | Scope | Profile | Inspect | History | ⚙ |
-+--------------------------------------------------------------------------------------------------+
-```
-
-Expected quick actions:
-
-- Start or pause capture
-- Toggle overlay mode
-- Toggle automatic translation
-- Change target language
-- Switch capture scope
-- Switch profile
-- Open inspect mode
-- Open settings
-
-Notes:
-
-- This can live as a slim floating utility bar or a compact docked controller.
-- It should not resemble a media editing timeline or browser toolbar.
-
-## 3. Settings Window
-
-Purpose:
-
-- House all non-immediate configuration
-- Remain compact and easy to scan
-
-Suggested information architecture:
-
-- General
-- Capture
-- Translation
-- Overlay
-- Dictionary
-- Shortcuts
-- Providers
-- Advanced
-- About
-
-Suggested layout:
-
-```text
-+--------------------------------------------------------------------------+
-| Settings                                                             [X] |
-+----------------------+---------------------------------------------------+
-| General              | Translation                                       |
-| Capture              |                                                   |
-| Translation          | Target language     [ English v ]                 |
-| Overlay              | Provider            [ OpenAI v ]                  |
-| Dictionary           | Auto translate      [ on ]                        |
-| Shortcuts            | Scan interval       [ 250ms -----o---- ]          |
-| Providers            | Smart idle pause    [ on ]                        |
-| Advanced             | Profile             [ Balanced v ]                |
-| About                |                                                   |
-|                      | Cloud routing       [ explicit only ]             |
-|                      | Session history     [ on for session ]            |
-|                      |                                                   |
-|                      |                 [ Reset ] [ Save ]                |
-+----------------------+---------------------------------------------------+
-```
-
-Notes:
-
-- Left navigation should stay shallow.
-- Most pages should fit in a single view without deep nesting.
-- Advanced settings should exist, but the default view should stay approachable.
-
-## 4. Overlay Translation Layer
-
-Purpose:
-
-- Present translated text near the original content
-- Stay readable without covering too much of the source
-- Support both horizontal and vertical Japanese text
-
-Suggested layout behavior:
-
-```text
-Screen content
-
-   [JP text box A]
-   [Translated box A]
-
-                    [JP text box B]
-                    [Translated box B]
-
-   [JP vertical text C]
-   [Translated box C]
-```
-
-Box style expectations:
-
-- Soft background fill or semi-transparent plate
-- Clear text contrast
-- Small radius
-- Modest padding
-- Minimal border or no border
-- Optional shadow only if needed for legibility
-
-Placement rules:
-
-- Default to placing translation over or just adjacent to the OCR box
-- Prefer preserving reading context over pixel-perfect source visibility
-- Allow a user option for lower opacity or alternate placement
-- Avoid aggressive animated motion between updates
-
-Overlay states:
-
-1. Hidden
-2. Realtime active
-3. Manual inspect targetable
-4. Paused
-5. Error or unavailable provider
-
-## 5. Manual Inspect and Dictionary Surface
-
-Purpose:
-
-- Give the user a precise, on-demand view
-- Allow deeper understanding without cluttering passive reading
-
-Suggested layout:
-
-```text
-+--------------------------------------------------------------+
-| Inspect                                                 [X] |
-+--------------------------------------------------------------+
-| Source text                                                   |
-| まったく目利きが出来ない俺だけど、外国の、古いものだ           |
-|                                                               |
-| Translation                                                   |
-| I cannot judge it at all, but I know it is an old foreign... |
-|                                                               |
-| Dictionary cards                                              |
-| [目利き] [noun] appraisal skill                               |
-| [外国]   [noun] foreign country                               |
-| [古い]   [adj ] old                                           |
-+--------------------------------------------------------------+
-```
-
-Notes:
-
-- This can be a small panel or popover rather than a full workspace.
-- It should open quickly from a text box or from the utility bar.
-
-## Region Selection Flow
-
-Purpose:
-
-- Let the user target a specific part of the screen for better performance
-
-Suggested flow:
-
-1. User clicks `Scope: Region`
-2. Screen dims
-3. User drags a rectangle
-4. Region preview appears
-5. User confirms or saves as preset
-
-Wireframe:
-
-```text
-Full screen dimmed
-
-   +----------------------------------+
-   | Selected capture region          |
-   +----------------------------------+
-
-   [Enter confirm]  [Esc cancel]  [Save preset]
-```
-
-## Main User Flows
-
-### Realtime Reading Flow
-
-1. Open app
-2. Pick scope
-3. Start realtime mode
-4. Overlay appears on detected Japanese text
-5. Changed text updates only when needed
-6. User pauses or adjusts settings from utility bar
-
-### Manual Inspect Flow
-
-1. Toggle inspect mode
-2. Hover or click OCR region
-3. Open inspect panel
-4. Read full translation and dictionary cards
-5. Close panel and continue reading
-
-### Provider Setup Flow
-
-1. Open providers settings
-2. Choose local, cloud, or AI provider
-3. Authenticate with OAuth or enter API key
-4. Save and test connection
-5. Set as active provider
-
-## Default Screen Set for v1
-
-The minimum set of screens for a usable v1 is:
-
-1. Onboarding setup
+1. Onboarding and settings window
 2. Utility bar
-3. Settings window
-4. Region selector
-5. Overlay layer
-6. Inspect panel
+3. Region selector
+4. Translation overlay
 
-Anything beyond this should be treated as optional polish, not core scope.
+## 1. Onboarding
+
+Onboarding uses a short linear flow and ends with a one-shot validation.
+
+```text
++----------------------------------------------------------------+
+| Rosecr setup                                              2 / 6 |
++----------------------------------------------------------------+
+| OCR assets                                                     |
+| owocr-japanese  v1.0       428 MB                               |
+| [####################..........]  67%   [Pause]                 |
+|                                                                |
+| Checksum verified after download                               |
+|                                                                |
+|                                      [Back] [Continue]          |
++----------------------------------------------------------------+
+```
+
+Steps:
+
+1. Explain local OCR and cloud text translation.
+2. Download and verify OCR assets.
+3. Sign in to the eligible Codex account.
+4. Select model, reasoning effort, and direction.
+5. Choose the game and region or whole-window scope.
+6. Run one-shot validation.
+
+Final state:
+
+```text
++----------------------------------------------------------------+
+| Setup complete                                                 |
++----------------------------------------------------------------+
+| ✓ Game window found                                            |
+| ✓ OCR ready                                                    |
+| ✓ Codex connected                                              |
+| ✓ Test translation displayed                                  |
+|                                                                |
+| Auto remains off. Enable it from the utility bar when ready.   |
+|                                             [Finish]            |
++----------------------------------------------------------------+
+```
+
+Play and Auto are disabled until required assets, target, direction, and authentication are ready.
+
+## 2. Utility Bar
+
+Default startup:
+
+```text
++------------------------------------------------------------------------------------------------+
+| [▶]  Idle  | 日本語 → English | Codex · low | Overlay ● | Auto ○ | Region | Clear | ⚙ |
++------------------------------------------------------------------------------------------------+
+```
+
+Auto active:
+
+```text
++------------------------------------------------------------------------------------------------+
+| [▶]  Watching | 日本語 → English | Codex · low | Overlay ● | Auto ● | Region | Clear | ⚙ |
++------------------------------------------------------------------------------------------------+
+```
+
+Waiting for the game:
+
+```text
++------------------------------------------------------------------------------------------------+
+| [▶]  Waiting: game window unavailable     [Retry]                         | Auto ● | ⚙ |
++------------------------------------------------------------------------------------------------+
+```
+
+Behavior:
+
+- Play captures and translates once.
+- Auto immediately starts or stops continuous translation.
+- Play during Auto forces an immediate refresh.
+- Overlay hides or reveals translations without changing Auto.
+- Clear removes overlays and local one-shot watchers.
+- Direction changes clear context, cache, pending work, and overlays.
+- Error and waiting text replaces decorative status icons when action is required.
+
+The utility bar may be pinned always-on-top. It remains separate from the click-through overlay and is excluded from capture.
+
+## 3. Settings
+
+```text
++--------------------------------------------------------------------------------+
+| Rosecr settings                                                            [×] |
++----------------------+---------------------------------------------------------+
+| General              | Translation                                             |
+| Capture              |                                                         |
+| Translation          | Codex account       doubl…                    [Sign out] |
+| Overlay              | Model               [ GPT-5.x Codex ▾ ]                 |
+| Shortcuts            | Reasoning           [ Low ▾ ]                           |
+| Diagnostics          | Direction           [ Japanese → English ▾ ]            |
+| About                |                                                         |
+|                      | Session context     5 recent units                      |
+|                      | Terminology         17 / 100               [Reset]       |
+|                      |                                                         |
+|                      | Auto always starts disabled.                            |
++----------------------+---------------------------------------------------------+
+```
+
+Capture page:
+
+```text
++--------------------------------------------------------------------------------+
+| Capture                                                                        |
+|                                                                                |
+| Game                 [ Trails through Daybreak.exe ▾ ]                         |
+| Scope                (●) Selected region  ( ) Whole game window                |
+| Region               x 0.41  y 0.67  w 0.53  h 0.21       [Reselect]          |
+| Profile              [ Balanced ▾ ]                                            |
+| Scan cadence         [ 250 ms ]                         Advanced               |
+|                                                                                |
+| Target unavailable: saved setup will reconnect automatically.                 |
++--------------------------------------------------------------------------------+
+```
+
+Overlay page:
+
+```text
++--------------------------------------------------------------------------------+
+| Overlay                                                                        |
+|                                                                                |
+| Backing              [ Blur when current ▾ ]                                   |
+| Theme                [ Neutral dark ▾ ]                                        |
+| Opacity              [----------●---] 88%                                      |
+| Minimum text size    [ 12 DIP ]                                                |
+| Font                 [ Noto Sans ▾ ]                                           |
+| Collision fallback   Edge callout                                              |
+|                                                                                |
+| [Reset defaults]                                                               |
++--------------------------------------------------------------------------------+
+```
+
+Diagnostics default to metadata and redacted errors. Text and image attachments require separate unchecked controls and a preview.
+
+## 4. Region Selection
+
+Region selection starts only after a game window is chosen.
+
+```text
+Chosen game client area
+
+┌──────────────────────────────────────────────────────────────┐
+│                                                              │
+│                 ┌──────────────────────────────┐             │
+│                 │ Selected capture region      │             │
+│                 │                              │             │
+│                 └──────────────────────────────┘             │
+│                                                              │
+│ [Enter] Save     [Esc] Cancel     [R] Reset                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+The saved rectangle is normalized to the game client area. Errors, app restart, game movement, and resolution changes do not erase it.
+
+## 5. Overlay States
+
+### Complete
+
+```text
+┌──────────────────────────────────────────┐
+│ Almost at the same time…? I wonder what │
+│ kind of people they are.                │
+└──────────────────────────────────────────┘
+```
+
+The source is concealed by a current blurred crop or neutral plate.
+
+### Updating
+
+```text
+┌──────────────────────────────────────────┐
+│ Almost at the same time…                 │  ↻
+└──────────────────────────────────────────┘
+```
+
+The last valid translation stays readable but slightly dimmed. Partial model tokens never appear.
+
+### First translation pending
+
+```text
+Original game text remains visible                                      ···
+```
+
+Rosecr does not obscure source text before it has a complete translation.
+
+### Failed update
+
+```text
+Current original game text remains visible                              !
+```
+
+An old translation is removed if it belongs to a previous source generation. The error indicator exposes Retry from the controller rather than accepting overlay clicks.
+
+### Dense layout fallback
+
+```text
+Source A ───────────────┐      ┌─────────────────────────────┐
+Source B ───────────┐   ├─────▶│ A  Complete translation…   │
+Source C ───────┐   │   │      │ B  Complete translation…   │
+                │   │   │      │ C  Complete translation…   │
+                └───┴───┘      └─────────────────────────────┘
+```
+
+The edge callout is used only after wrapping, readable shrinking, expansion, and repositioning fail. Translation is never silently truncated.
+
+## Core Flows
+
+### One-shot
+
+1. User presses Play or its shortcut.
+2. Rosecr captures and OCRs once.
+3. Eligible boxes are translated and committed atomically.
+4. Local frame-difference watchers monitor translated regions.
+5. A changed source clears its overlay without another cloud request.
+
+### Auto
+
+1. User enables Auto.
+2. Rosecr continuously watches for changed frames.
+3. Stable eligible text is translated.
+4. Unchanged content produces no provider calls.
+5. Disabling Auto cancels pending work and leaves only local source-change watchers.
+
+### Game unavailable
+
+1. Target minimizes, closes, or becomes uncapturable.
+2. Overlays clear and status changes to Waiting.
+3. Capture configuration remains saved.
+4. A uniquely matching returning window reconnects automatically.
+
+### Provider failure
+
+1. A transient failure retries once.
+2. A second failure or permanent failure reveals current source text.
+3. Utility bar and diagnostics show an actionable error.
+4. Capture selection remains intact.
+
+## Deferred Surfaces
+
+Post-v1 plans may add manual inspect, dictionary cards, persistent history, CAT-Translate, and additional provider settings. They are not part of the v1 navigation or release gate.

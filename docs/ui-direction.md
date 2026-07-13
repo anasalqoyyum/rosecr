@@ -1,56 +1,82 @@
 # UI Direction
 
-This document captures the intended visual direction for the desktop OCR translator.
+This document translates the PRD into a compact Windows utility aesthetic. The overlay is the product; configuration should stay out of the player's way.
 
-## Summary
+## Principles
 
-The product UI should feel like a lightweight desktop utility:
+- Keep the utility bar compact and immediately understandable.
+- Prioritize readable translation and stable placement over decoration.
+- Never steal focus or intercept game input from passive overlays.
+- Show state clearly: idle, translating, Auto active, waiting, and error.
+- Avoid dashboards, chat layouts, nested cards, and developer-facing controls in the primary flow.
 
-- Simple, compact settings surfaces
-- Fast access to core toggles
-- Minimal visual noise
-- Overlay text that is readable but not overly heavy
-- A design that feels practical for long reading sessions
+## Utility Bar
 
-The app should avoid looking like a full admin dashboard, a chat app, or a complex creative tool.
+The persistent controller takes inspiration from Gaminik's Windows toolbar without copying its visual identity.
 
-## Settings Reference
+Required controls:
 
-The settings experience should be close to this style:
+- Play for one-shot translation
+- Japanese-to-English or English-to-Japanese direction
+- Codex model and reasoning access
+- Overlay visibility
+- Auto
+- Region or whole-game-window scope
+- Clear overlays
+- Settings
 
-- Left-side navigation
-- Compact forms and toggles
-- Utility-focused layout
-- Small persistent controls for common actions
+Play is not a start/stop button. Auto starts continuous translation immediately and always initializes off when Rosecr launches. Hiding overlays does not silently disable Auto, so its active state must remain visually obvious.
 
 Reference:
 
 ![Settings reference](https://www.gaminik.net/static/images/windows/windows1_960.png)
 
-## Overlay Reference
+## Settings
 
-The overlay translation experience should be close to this style:
+Use shallow left navigation and compact forms:
 
-- Translation rendered directly over the source area
-- Lightweight translated text boxes anchored to OCR regions
-- Readable contrast and restrained chrome
-- Suitable for games, manga, and general desktop reading
+- General
+- Capture
+- Translation
+- Overlay
+- Shortcuts
+- Diagnostics
+- About
+
+V1 has one provider, so the UI should say `Codex account`, not present a provider marketplace or empty provider selector. Model and reasoning controls show only options reported for the signed-in account.
+
+## Overlay
+
+Translations should feel integrated into the game rather than presented in a separate panel.
+
+- Anchor each translation to its OCR box.
+- Obscure translated source text with a current blurred crop or a neutral plate.
+- Preserve target-language UI, numbers, symbols, and non-linguistic content.
+- Wrap, expand, or reposition before shrinking.
+- Never silently truncate or overlap translations.
+- Use an edge callout only when no readable in-place layout exists.
+- Keep the previous valid translation dimmed while an update is pending.
+- Commit completed translations atomically; never display streamed tokens.
+- Use only a brief opacity transition, disabled by Windows reduced-motion preferences.
 
 Reference:
 
 ![Overlay reference](https://www.gaminik.net/static/images/v2/en_page2.png)
 
-## Design Notes
+## Typography and Color
 
-- Overlay boxes should prioritize readability first, decoration second.
-- The default theme should be neutral and unobtrusive.
-- Users should be able to change theme, colors, opacity, font sizing, and density.
-- The realtime controls should stay easy to understand: mode, provider, target language, capture scope, and scan cadence.
-- `Scan interval` is a better user-facing term than `translation interval`, because translation should primarily occur only when text changes.
+- Default to Noto Sans and Noto Sans JP or equivalent redistributable fonts.
+- Maintain at least the configured readable minimum, initially 12 device-independent pixels.
+- Use neutral dark or light plates with strong contrast.
+- Allow theme, opacity, size, outline, and density adjustments.
+- Approximate source weight and alignment only when readability remains strong.
 
-## Implementation Implication
+## Interaction
 
-The visual system should support two surfaces:
+Passive overlays are transparent, non-focusable, click-through, and excluded from capture. Interaction occurs only in the utility bar, settings, onboarding, and temporary region selector.
 
-1. A compact settings app window
-2. A transparent overlay layer for translated text boxes and manual inspect interactions
+Global shortcuts should be configurable for Play, Auto, overlay visibility, and Clear. Registration conflicts must be visible and shortcuts may be disabled individually.
+
+## Deferred UI
+
+Manual inspect panels, dictionary cards, provider switching, persistent history, and learning workflows are post-v1 surfaces and should not occupy v1 navigation.

@@ -1,20 +1,32 @@
 # rosecr
 
-Windows-first desktop OCR translator for Japanese text on screen.
+Windows-first OCR translation overlays for Japanese and English video games.
 
-## Overview
+Rosecr targets a selected game window in windowed or borderless-fullscreen mode, runs OCR locally, translates eligible text through the user's Codex subscription, and replaces source text with a click-through overlay. Users can translate the current capture once with Play or enable Auto for continuous change-driven translation. Auto always starts disabled.
 
-Rosecr is planned as an Electron desktop app with a Python OCR sidecar. The goal is to detect Japanese text anywhere on screen, translate it in near real time, and render lightweight overlay translations directly over the source text.
+## V1 scope
 
-## Docs
+- Windows 11 x64 primary target
+- Selected region or whole selected game window
+- Japanese to English and English to Japanese
+- Local `owocr` processing through a bundled Python sidecar
+- Codex subscription OAuth through a pinned `@earendil-works/pi-ai` adapter
+- Source-replacement overlays with stale-result protection and collision handling
+- No game injection, memory reading, or text hooks
 
-- PRD: `desktop-ocr-translator-prd.md`
-- UI direction: `docs/ui-direction.md`
-- Wireframes: `docs/wireframes.md`
-- Architecture: `docs/architecture.md`
-- Milestones: `docs/milestones.md`
-- Vertical-slice todos: `docs/todos/README.md`
+Exclusive fullscreen, whole-desktop capture, manual inspect, dictionary cards, offline CAT-Translate, DeepL, Google Translate, and BYOK providers are deferred.
+
+## Documentation
+
+- [Product requirements](desktop-ocr-translator-prd.md)
+- [Technical architecture](docs/architecture.md)
+- [UI direction](docs/ui-direction.md)
+- [Wireframes](docs/wireframes.md)
+- [Implementation milestones](docs/milestones.md)
+- [Vertical-slice todos](docs/todos/README.md)
+
+The PRD is authoritative when planning documents disagree.
 
 ## Status
 
-Planning and documentation only. Implementation has not started yet.
+Planning and documentation only. Implementation has not started.

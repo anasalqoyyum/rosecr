@@ -2,137 +2,251 @@
 
 ## Problem Statement
 
-People who read Japanese text in games, manga, visual novels, videos, PDFs, and desktop applications often hit a hard tooling limit: existing solutions are usually browser-specific, app-specific, or optimized for manual popup lookup rather than continuous reading. The user wants a desktop application that works anywhere on screen, performs OCR on visible Japanese text, and overlays translation directly over the original text in near real time. It should stay lightweight, feel responsive, support both passive reading and manual inspection, and give users strong control over performance, privacy, providers, hotkeys, theme, and layout.
+People who play Japanese video games often hit a hard tooling limit: existing solutions require switching away from the game, depend on game-specific text hooks, or show translations in a separate window that interrupts play. The user wants a desktop application that recognizes visible Japanese text in a windowed or borderless-fullscreen game and replaces it in place with translated text in near real time. The replacement should visually obscure the original text and preserve the surrounding game UI as much as practical, so the result feels closer to an unofficial localization layer than a separate OCR utility.
+
+The primary v1 experience is continuous game translation. The user targets either a selected area inside a game or the entire game window, starts translation, and continues playing while translated text appears over dialogue, menus, logs, and other readable game UI. Exclusive fullscreen support is not required because capture and overlay behavior is less reliable in that mode.
 
 ## Solution
 
-Build a Windows-first desktop application using Electron for the shell, overlay UI, settings, and desktop integration, plus a bundled Python sidecar for OCR and Japanese-specific text processing using `owocr`. The app captures either the full screen, a selected region, or an active window; detects when visible Japanese text changes; runs OCR locally; translates the extracted text through a selectable provider stack; and renders translated text as an on-screen overlay aligned to the original text boxes.
+Build a Windows-first desktop application using Electron for the shell, overlay UI, settings, and desktop integration, plus a bundled Python sidecar for OCR and Japanese-specific text processing using `owocr`. The app captures either a selected region within a game or the entire selected game window; detects when visible Japanese text changes; runs OCR locally; translates the extracted text through the user's Codex subscription; and renders translated text in place over the original text boxes.
 
-The product supports two primary modes:
+By default, each translated overlay should conceal the original Japanese using a blurred or opaque backing treatment derived from or visually compatible with the surrounding game UI, then render the translation inside the same approximate area. When an exact replacement would make the translation unreadable or would cover important UI, the compositor may expand or reposition the translated area according to predictable placement rules.
 
-- Passive realtime mode: continuously scans while enabled, pauses unnecessary work when the image or OCR result is unchanged, and overlays translated text per OCR text box.
-- Manual inspect mode: lets the user target text on demand, view the translation in a focused panel, and open mini dictionary cards for word-level lookup.
+The user explicitly selects either Japanese-to-English or English-to-Japanese before translation begins. The realtime pipeline should not run automatic language identification for every OCR result. Instead, a cheap deterministic script and content gate decides whether a text box contains eligible source-language text. Target-script-only and non-linguistic text should remain untouched: they should not be sent to a translation provider and should not receive an overlay, preserving styled labels, menu headings, button prompts, numbers, symbols, and other existing localization. Mixed English-Japanese text should be handled without needlessly replacing target-language spans where OCR geometry makes that distinction reliable.
+
+AI translation providers should use bounded session context by default to improve dialogue continuity and recurring game terminology. The context consists of the five most recent completed source-and-translation units plus a compact session terminology glossary. It remains in memory for the active session, contains no screenshots, can be reset by the user, and is discarded when the session ends.
+
+The v1 product exposes two complementary control paths over the same pipeline:
+
+- Manual Play action: performs one capture, OCR, and translation pass over the configured area, then returns to idle without requiring Auto.
+- Auto mode: begins continuous change-driven scanning as soon as the user enables it, pauses unnecessary work when the image or OCR result is unchanged, and never requires the user to press Play.
+
+Manual inspect mode and dictionary cards remain documented as post-v1 todos, but they are not required for the first usable release.
 
 The visual direction should feel closer to a lightweight desktop utility than a full creative suite: compact settings surfaces, low-friction controls, and unobtrusive overlay boxes that are easy to read without overwhelming the underlying content.
 
 The intended UI direction is explicitly inspired by the provided references: a simple utility-style settings app with a left navigation rail and compact controls, plus lightweight overlay translation boxes rendered directly over source text in a style similar to screen-translation tools. The product should not default to a complex dashboard or developer-facing control surface.
 
-The first release is optimized for Japanese to English and Japanese to Indonesian, while keeping the architecture extensible to additional target languages. Translation providers are hybrid by design: local/offline-friendly translation, cloud machine translation, and AI translation through OpenAI-compatible providers. The app is local-first, stores captured text only for the active session by default, and makes cloud usage explicit and user-controlled.
+The first release prioritizes the English-Japanese language pair in both directions while keeping the architecture extensible to additional languages. Its only translation provider uses the user's eligible ChatGPT/Codex subscription through ChatGPT-managed OAuth and a pinned `@earendil-works/pi-ai` adapter. Local CAT-Translate, DeepL, Google Translate, and OpenAI-compatible BYOK providers are deferred as documented post-v1 todos. The app runs capture, OCR, and text processing locally, stores captured text only for the active session by default, and makes cloud usage explicit and user-controlled.
 
 ## User Stories
 
 1. As a Japanese learner, I want translation overlaid directly on text I can see on screen, so that I can keep reading without switching tools.
-2. As a visual novel player, I want the app to work on arbitrary windows, so that I am not limited to browser extensions or game-specific hooks.
-3. As a manga reader, I want to select a static region of the screen, so that OCR focuses on the page area and avoids wasted work.
-4. As a desktop user, I want fullscreen capture support, so that I can scan anything visible on screen.
-5. As a game player, I want active-window capture, so that the app follows one game window instead of the entire desktop.
+2. As a game player, I want the app to work without game-specific text hooks, so that I can translate many windowed or borderless-fullscreen games.
+3. As a game player, I want to select a region inside the game, so that OCR focuses on dialogue or another stable text area and avoids wasted work.
+4. As a game player, I want whole-game-window capture, so that menus, dialogue, logs, and changing UI layouts can all be translated.
+5. As a game player, I want capture and overlays to remain attached to the selected game window as it moves or resizes, so that translation stays aligned during play.
 6. As a fast reader, I want translated text to appear with low visible delay, so that the overlay feels usable in realtime.
 7. As a quality-focused reader, I want performance profiles, so that I can choose fast, balanced, or more accurate behavior depending on content.
 8. As a default user, I want balanced mode to work well out of the box, so that I do not need to tune settings before reading.
 9. As a privacy-conscious user, I want OCR to run locally, so that screenshots do not need to leave my machine.
 10. As a privacy-conscious user, I want cloud translation to be opt-in, so that I always know when text is sent to an external provider.
-11. As an offline user, I want a local translation option, so that the app remains useful without internet access.
-12. As a cloud user, I want to choose between translation providers, so that I can trade off quality, speed, privacy, and cost.
-13. As an AI translation user, I want OpenAI-compatible translation support, so that I can use higher-context translation when needed.
-14. As a provider-aware user, I want both OAuth-based sign-in and BYOK configuration where supported, so that I can use the account model I prefer.
-15. As a cost-sensitive user, I want it to avoid retranslating unchanged text, so that the app reduces latency and API spend.
+11. As an offline user in a future release, I want a local CAT-Translate option, so that the app remains useful without internet access.
+12. As a cloud user in a future release, I want to choose between translation providers, so that I can trade off quality, speed, privacy, and cost.
+13. As an AI translation user, I want Codex-subscription translation support, so that I can use higher-context translation without separate API billing.
+14. As a provider-aware user in a future release, I want BYOK configuration where supported, so that I can use the account model I prefer.
+15. As a cost-sensitive user, I want it to avoid translating unchanged or already-target-language text, so that the app reduces latency and API spend.
 16. As a user reading static content, I want the app to pause or throttle when text is unchanged, so that it does not waste CPU, GPU, or translation calls.
-17. As a user reading Japanese subtitles or dialogue, I want per-text-box overlays, so that translated text appears near the original content.
-18. As a reader of vertical Japanese text, I want the app to recognize and place overlays correctly, so that manga and vertical UI are usable.
-19. As a reader of horizontal Japanese text, I want the app to work well on subtitles, menus, and common UI text, so that it covers mainstream cases.
+17. As a game player, I want per-text-box overlays that obscure translated source text, preserve text already in my target language, and expand without colliding when necessary, so that the result remains readable without replacing styled game UI unnecessarily.
+18. As a reader of vertical Japanese text, I want the app to recognize and place overlays correctly, so that games with vertical UI remain usable.
+19. As a reader of horizontal Japanese text, I want the app to work well on dialogue, subtitles, menus, and common game UI text, so that it covers mainstream cases.
 20. As a customization-focused user, I want to change hotkeys, so that the app fits my workflow and avoids conflicts.
 21. As a customization-focused user, I want to adjust theme, colors, opacity, and layout, so that the overlay remains readable over different backgrounds.
 22. As a customization-focused user, I want to tune overlay density and behavior, so that I can minimize clutter or maximize context.
 23. As a customization-focused user, I want control over scan cadence or refresh interval, so that I can trade off responsiveness, resource usage, and API spend.
-24. As a user who does not want constant overlays, I want a manual mode, so that I can invoke translation only when needed.
-25. As a user in manual mode, I want a focused inspect view, so that I can read a clean translation without surrounding overlay noise.
-26. As a learner, I want mini dictionary cards in inspect mode, so that I can look up individual words from OCR text.
-27. As a learner, I want the app to preserve useful text grouping and reading order, so that translation quality is better than raw OCR fragments.
+24. As a user who does not want constant scanning, I want a one-shot Play action, so that I can translate the configured area only when needed.
+25. As a future user, I want a focused inspect view, so that I can read a clean translation without surrounding overlay noise. (Post-v1)
+26. As a future learner, I want mini dictionary cards in inspect mode, so that I can look up individual words from OCR text. (Post-v1)
+27. As a story-focused player, I want recent dialogue and recurring terminology used as translation context, so that names, factions, titles, pronouns, and tone remain consistent.
 28. As a user reading noisy content, I want Japanese-aware OCR cleanup heuristics, so that common recognition artifacts do not immediately degrade translation.
 29. As a user reading repeated UI labels, I want translation caching within the session, so that common text appears quickly.
 30. As a user with a weak machine, I want region-based scanning and configurable profiles, so that the app remains usable on lower-end hardware.
 31. As a user with a high-resolution display, I want the overlay to align accurately with source text boxes, so that the translation feels anchored to the content.
 32. As a user who wants a simple tool, I want a compact utility-style settings window, so that configuration feels fast and not overwhelming.
 33. As a user juggling multiple apps, I want saved regions and reusable capture presets, so that I can switch between common setups quickly.
-34. As a user who changes target languages, I want target language selection in settings, so that I can switch between English, Indonesian, and future languages.
+34. As a bilingual game player, I want to select English-to-Japanese or Japanese-to-English explicitly, so that I can use either direction without spending realtime processing on automatic language identification.
 35. As an accessibility-focused user, I want keyboard-first controls and readable overlay styling, so that the app remains usable without precise mouse interaction.
 36. As an open-source user, I want the core app and docs to be open, so that I can inspect the architecture and contribute improvements.
 37. As a developer contributor, I want provider integrations to be modular, so that new OCR, translation, or dictionary engines can be added without rewriting the app.
 38. As a support-oriented user, I want clear status indicators for capture, OCR, translation provider, and errors, so that failures are understandable.
 39. As a cautious user, I want explicit permission prompts and provider disclosures, so that I know what data is being processed locally versus remotely.
 40. As a first-time user, I want a single installer, so that setup feels straightforward even if OCR assets download afterward.
-41. As a first-time user, I want guided setup for OCR assets and translation providers, so that I can reach a working state without manual digging.
+41. As a first-time user, I want guided setup for OCR assets and Codex authentication, so that I can reach a working state without manual digging.
 42. As a future maintainer, I want the app split into deep modules with stable interfaces, so that performance and provider changes do not constantly break the UI.
+43. As a game player reading progressively revealed dialogue, I want incomplete translations to be superseded when more source text appears, so that the overlay converges on the complete line instead of getting stuck on an early fragment.
+44. As a game player waiting for an updated translation, I want the last valid translation to remain visible in a clearly marked updating state, so that changing dialogue does not cause distracting blank or flickering overlays.
+45. As a game player, I want completed translations to appear atomically rather than token by token, so that overlays do not resize or flicker while the model is responding.
+46. As a game player, I want a failed update to reveal the newer original text instead of leaving an outdated translation over it, so that Rosecr never presents stale dialogue as current.
+47. As a game player, I want transient translation failures retried once without creating an endless request loop, so that brief network problems can recover without wasting subscription usage during an outage.
+48. As a game player, I want uncertain OCR confirmed before it is translated, so that unstable recognition does not cover correct game text with a misleading translation.
+49. As a game player, I want overlays to survive a single missed OCR scan, so that momentary recognition noise does not make translations flicker.
+50. As a returning game player, I want my selected game and capture area preserved across errors and app restarts, so that I do not have to configure capture again when something goes wrong.
+51. As a player viewing text-heavy screens, I want changed text boxes translated together when practical, so that menus and logs appear consistently without unnecessary provider overhead.
+52. As a subscription-conscious user, I want Rosecr to launch idle with Auto disabled, so that restoring my saved setup never starts OCR or cloud translation until I press Play or enable Auto.
+53. As a one-shot user, I want an overlay cleared when its underlying source changes, so that a manual translation never remains over unrelated game content.
+54. As a game player, I want every passive overlay to be click-through and non-focusable, so that Rosecr never intercepts gameplay input.
+55. As a game player, I want Rosecr excluded from its own capture, so that overlays and controls do not recursively enter OCR.
+56. As a multi-monitor user, I want capture and overlays to remain aligned across mixed DPI and display changes, so that moving or resizing the game does not offset translations.
+57. As a game player, I want capture to pause safely when the game is minimized or unavailable and resume when it returns, so that failures do not destroy my setup or waste resources.
+58. As a reader of dense screens, I want a deterministic overflow layout that preserves the complete translation, so that Rosecr never silently truncates text or stacks translations on top of each other.
+59. As a privacy-conscious user, I want diagnostics to exclude screenshots, OCR text, translations, and credentials by default, so that troubleshooting does not leak game content or account secrets.
+60. As a user, I want the OCR sidecar to recover once from a crash without entering a restart loop, so that a transient failure is repaired but a persistent problem remains understandable.
+61. As a quality-focused user, I want cached translations reused only when all meaning-relevant settings and context match, so that speed does not come from displaying an inappropriate old translation.
+62. As a first-time user, I want onboarding to finish with a successful one-shot translation while Auto remains off, so that I can verify the setup before continuous cloud usage begins.
+63. As a security-conscious user, I want recognized game text treated only as untrusted translation data, so that instructions displayed inside a game cannot alter Rosecr's model behavior.
 
 ## Implementation Decisions
 
 - The desktop shell will be Electron-based. Electron owns window lifecycle, transparent overlay windows, hotkeys, settings UI, installer flow, and system integration.
 - OCR will run in a local Python sidecar process. The sidecar will be bundled and launched by the Electron app, rather than requiring the user to manually run Python.
 - The OCR engine for v1 is `owocr`, with Japanese-aware preprocessing and reading-order heuristics handled in the Python sidecar.
-- The product is Windows-first for v1. macOS and Linux are intentionally deferred so Windows capture APIs, packaging, and overlay behavior can be optimized first.
-- Capture scope in v1 includes fullscreen capture, one-off or saved screen regions, and active-window capture.
-- Realtime mode defaults to continuous scanning with smart idle pause. In practice, the app should avoid re-running translation when the captured image or OCR text has not materially changed.
+- The primary v1 platform is 64-bit Windows 11. Windows 10 version 2004 or newer may be supported where the pinned Electron, Python, OCR, and capture stack remains compatible, but Windows 10 is not allowed to weaken the Windows 11 release gate. Windows on ARM, 32-bit Windows, macOS, and Linux are deferred.
+- Capture scope in v1 includes a selected region within a chosen game window and the entire chosen game window. The target remains pinned to that game rather than silently following whichever application becomes active.
+- Windowed and borderless-fullscreen games are supported capture environments for v1. Exclusive fullscreen and whole-desktop capture are not v1 requirements.
+- The v1 capture backend must use a window-level Windows capture path compatible with `Windows.Graphics.Capture` semantics: explicit window targeting, frame delivery off the UI thread, resize/device-loss recovery, and no dependency on the game being the foreground window. An early implementation spike must validate whether Electron's available capture path satisfies latency, exclusion, and alignment requirements; if it does not, a thin native Windows helper becomes v1 work rather than a deferred optimization.
+- Rosecr must remain external to the game process: no DLL injection, memory reading, text hooks, executable patching, or automated elevation. Capture incompatibility with an elevated, protected, anti-cheat, or DRM-controlled game is surfaced as an actionable limitation rather than worked around by modifying the game.
+- All Rosecr overlay and controller windows must be excluded from supported Windows capture paths using Electron content protection or the corresponding `WDA_EXCLUDEFROMCAPTURE` behavior. The Capture Engine must additionally reject Rosecr-owned windows as targets and detect capture recursion during diagnostics.
+- Overlay windows must be transparent, non-focusable, and click-through during v1 operation. Only the separate utility bar, settings window, and temporary region-selection surface may receive pointer or keyboard input. Showing or updating an overlay must never activate Rosecr or remove focus from the game.
+- Capture geometry should use physical pixels internally. Persisted regions remain normalized to the target client area, while DPI conversion occurs only at the window and renderer boundaries. A monitor, DPI, client-size, or display-topology change invalidates current geometry; Rosecr must obtain a fresh frame and recalculate overlays before showing them again.
+- Captured HDR or advanced-color frames should be normalized into a consistent SDR representation before OCR and frame comparison. Perfect HDR color reproduction is not a v1 goal, but washed-out frames must not silently enter OCR without normalization or a visible compatibility warning.
+- The selected game identity, capture mode, and region are durable configuration. A region should be stored as normalized coordinates relative to the game client area so it survives window movement, resizing, resolution changes, Rosecr restarts, capture failures, OCR failures, provider failures, and temporary target-window loss. This configuration remains until the user explicitly edits or deletes it.
+- When a configured game window temporarily disappears, Rosecr should stop capture, clear active overlays, retain the capture configuration, show an error or waiting state, and automatically reattach when the matching game window returns. If multiple windows match, the user may be asked to identify the target again, but the saved region must not be discarded or require redrawing.
+- A minimized, closed, protected, or otherwise uncapturable target should enter a waiting state rather than producing blank OCR. Auto remains logically enabled only for temporary target unavailability and resumes when valid frames return; explicit user disablement, sign-out, or application shutdown still turns Auto off.
+- Rosecr should restore saved configuration on launch but always enter an idle state. It must not start capture, OCR, or Codex requests until the user explicitly presses Play for a one-shot translation or enables Auto for continuous translation. A previous active state must never be restored automatically.
+- The compact control surface should include a Gaminik-inspired Play button plus a separate Auto toggle. Pressing Play performs one immediate translation pass and returns to idle; it is not a start/stop control. Enabling Auto immediately starts continuous change-driven translation without requiring Play, and disabling Auto stops continuous scanning. Auto must initialize as disabled on every application launch even if it was enabled previously.
+- Pressing Play while Auto is enabled should request an immediate refresh of the current capture rather than creating a second capture loop.
+- After a one-shot Play result, Rosecr should retain the overlay while running only lightweight local frame-difference checks over translated source regions. When a region changes materially, its overlay is cleared without OCR or a Codex request. The watcher stops after every one-shot overlay has cleared or the user explicitly clears them.
+- Disabling Auto stops new capture/OCR work, cancels queued or in-flight translations, and applies the same lightweight source-change watcher to any completed overlays that remain. An obsolete in-flight result cannot appear after Auto is disabled.
+- Overlay visibility is independent from Auto. Hiding the overlay provides a quick view of the original game while Auto may continue keeping translations current; the control must make the still-active Auto state obvious. A separate Clear action discards current overlays and their one-shot watchers.
+- Play, Auto, overlay visibility, and Clear should have configurable global shortcuts. Defaults must be conservative, shortcuts may be disabled individually, and registration conflicts must be shown instead of silently intercepting or replacing another application's binding.
+- When Auto is enabled, realtime operation uses continuous scanning with smart idle pause and should avoid re-running OCR or translation when the captured image or OCR text has not materially changed.
 - The default performance profile is balanced. Additional profiles should expose meaningful differences in capture cadence, OCR cleanup depth, translation batching, and overlay update frequency.
+- Initial profile defaults are Fast at roughly 150 ms capture cadence and 200 ms translation debounce, Balanced at 250 ms and 300 ms, and Accurate at 500 ms and 500 ms with stronger OCR preprocessing. These are starting values, not promises across all hardware; advanced settings may override them. The 1.5-second responsiveness target applies to the Balanced profile on the reference test system.
 - The app should expose an advanced user setting for scan interval or refresh cadence, but translation itself should remain event-driven by content change. The interval setting is a throttle for capture/OCR polling, not the primary correctness mechanism.
 - OCR results should be tracked per text box, with stable identifiers where possible, so the system can deduplicate repeated text and keep overlays visually anchored.
+- OCR results below the trusted-confidence threshold should become translation-eligible only when the same normalized text is detected in a spatially matching box across two consecutive scans. High-confidence results may proceed after the normal debounce without this extra scan. Uncertain text that keeps changing remains untranslated and unobscured, and the 1.5-second completion target begins only after the text qualifies as stable.
+- A tracked text box and its overlay should remain present through one scan in which the box is not detected. They should be removed only after the box is absent for two consecutive scans. This grace period does not apply when translation is stopped, the selected game or capture scope changes, the target window closes, or the session is reset; those events clear affected overlays immediately.
+- The balanced profile should debounce a changed OCR box until it has been unchanged for roughly 300 ms before starting translation. This allows ordinary typewriter-style dialogue to finish without waiting for the full latency budget.
+- If a tracked text box changes while its translation is queued or streaming, the older request should be cancelled where possible and always marked obsolete. The new OCR text should start a fresh debounced translation, and an obsolete result must never overwrite a newer result.
+- The v1 responsiveness target is visible translating feedback within 500 ms of eligible source text being detected and a completed overlay within 1.5 seconds after the latest OCR text becomes stable under representative conditions. The pipeline continues watching for changes throughout this period; 1.5 seconds is a latency target, not a fixed refresh interval.
+- While a previously translated text box is being retranslated, its last valid translation should remain visible but slightly dimmed with a minimal updating indicator. The overlay returns to normal only when the newest completed translation replaces it. If the box has no prior translation, the source remains unobscured while a small non-blocking translating indicator is shown.
+- Codex response streaming is an internal transport detail used for cancellation and completion tracking. Partial tokens should be buffered off-screen and never rendered into the game overlay. A translation is committed atomically only after the response completes successfully, is validated, and still matches the latest generation of its tracked OCR box; cancelled, failed, or obsolete partial output is discarded.
+- If translation fails and the retained translation belongs to an older source generation, the compositor should remove that mismatched translation, reveal the current game text, and show a small retry/error indicator. A retained translation may remain only when it still corresponds to the current OCR source, such as when a manual refresh of unchanged text fails.
+- The Translation Router should automatically retry a failed request at most once when the failure is transient, using a short backoff of roughly 750 ms or a short provider-supplied retry delay. Transport interruptions, timeouts, and recoverable server failures are retryable. Authentication failures, exhausted allowance, unsupported models, invalid requests, cancellations, and obsolete OCR generations are not. The overlay remains in its updating state during the retry; after the retry fails, normal failure behavior applies and the user may retry manually.
+- Stable changed boxes that become eligible within the same debounce window should be combined into one Codex request where practical. Each request and response item must carry an opaque box identifier and source-generation identifier so translations can be validated and mapped back to the correct overlay without relying on response order.
+- A translation batch should contain at most eight boxes and approximately 2,000 source characters. Larger sets are split in visual reading order. At most two Codex batches may be in flight; newer visible dialogue takes priority over background or older pending work.
+- Batched results remain atomic per text box: nothing is rendered token by token, but valid items from a completed batch may be committed independently. If one box changes while its batch is in flight, only that item's result becomes obsolete; the request should be cancelled only when every item in it is obsolete. The changed box may enter a newer batch without waiting for the older batch to finish.
+- Translation direction is an explicit session setting and is never inferred per OCR box in the realtime path.
+- Before provider routing, recognized text should pass through a deterministic script and content gate rather than a general language-identification model. In Japanese-to-English mode, boxes without Japanese script bypass translation. In English-to-Japanese mode, boxes without meaningful Latin-alphabet content bypass translation. Target-script-only, numeric-only, symbol-only, and other non-linguistic boxes receive no overlay.
 - Overlay rendering should be per text box by default, not paragraph-wide by default. This keeps placement closer to the source and reduces ambiguity in mixed layouts.
-- The overlay visual style should default to lightweight translated boxes with clear contrast, modest padding, and minimal chrome, following a utility-like desktop feel rather than a heavy control panel aesthetic.
-- The settings UI should default to a compact utility-app layout with simple navigation, plain controls, and a small always-available control surface for mode toggles such as overlay mode, auto-translation, capture scope, and settings access.
+- The overlay compositor should obscure the source text using a blurred or opaque backing treatment before drawing the translation. It should preserve the surrounding game UI where practical and use predictable expansion or repositioning when translated text does not fit the source box.
+- The preferred blurred backing is produced locally from the latest captured crop beneath the source box. If that crop is stale, unavailable, HDR-incompatible, or visually unsuitable, the compositor uses an opaque or semi-opaque theme plate instead of fabricating background content.
+- Expanded translated boxes must remain anchored to their source regions and must not overlap other translated boxes. Placement should consider all visible OCR regions together rather than laying out each box independently. Target-language-only regions should act as protected content that the compositor avoids covering where practical.
+- Collision resolution follows a fixed order: preserve the source anchor and wrap text; shrink only to the user-configured readable minimum, defaulting to 12 device-independent pixels; expand into unoccupied non-text space; reposition within the game bounds while maintaining a clear source association; then use a compact edge callout with a leader line as the last resort. Translations must never silently truncate, overlap another translation, or cover a protected target-language region or known game control when a callout can avoid it.
+- Overlay layout is committed atomically with the completed translation. Position and size changes should not animate during play beyond a short opacity transition, and Windows reduced-motion preferences disable even that transition.
+- Rosecr should bundle readable, redistributable fallback fonts covering both languages, initially Noto Sans and Noto Sans JP or equivalents with compatible licensing. The compositor may approximate weight, alignment, color, and outline from the source but should prioritize readability over exact game-font imitation.
+- The overlay visual style should default to source-replacement text with clear contrast, modest padding, and minimal chrome, following a utility-like desktop feel rather than a floating translation panel aesthetic.
+- The settings UI should default to a compact utility-app layout with simple navigation, plain controls, and a small always-available control surface containing the one-shot Play action, overlay visibility, Auto, translation direction, capture scope, provider/model access, and settings.
 - Japanese-specific post-processing in v1 should be reading-aware but not attempt heavy document reconstruction. The app should normalize common OCR artifacts, infer likely line order, and merge only where confidence is high.
 - Vertical and horizontal Japanese text are explicit v1 requirements. Stylized and dense text may be improved later, but the first release should be architected to support future preprocessing upgrades.
-- Manual inspect mode is a first-class feature, not a debug panel. It should support focused translation display plus mini dictionary cards derived from OCR text.
-- The app should support a provider-router abstraction for translation. Provider selection, credentials, rate limits, retries, and fallback behavior should not be hardcoded into the UI.
+- Manual inspect mode, dictionary cards, and local CAT-Translate support are deferred until after the first usable release. Their existing todos remain valid future work, and the OCR, tracking, and translation interfaces should avoid preventing their later implementation.
+- The app should put translation behind a provider-router abstraction even though v1 has only one provider. Codex credentials, rate limits, retries, and errors should not be hardcoded into the UI, so later providers can be added without restructuring the application.
 - The realtime pipeline should use a layered throttling model: frame-difference detection first, OCR text-difference detection second, then provider-specific translation debouncing and caching. This is preferable to a naive fixed translation interval.
-- Translation provider categories in v1 are:
-- Local translation: an offline-friendly provider path, initially represented by a local engine such as Argos Translate or a comparable embeddable MT backend.
-- Cloud deterministic MT: adapters for DeepL and Google Translate.
-- AI translation: an OpenAI-compatible adapter, with OpenAI as the first supported provider. OAuth should be supported where the provider permits it, and BYOK must also be supported.
+- The only translation provider in v1 is AI translation through a Codex subscription. It uses a pinned version of `@earendil-works/pi-ai` from the Electron main process. Only its provider and streaming layer is used; Rosecr does not require `pi-agent-core` or expose an autonomous tool-using agent.
+- Post-v1 local translation todo: add CAT-Translate as the preferred offline English-Japanese provider behind the same translation-router contract. It is not part of the first-release implementation or release gate.
+- Post-v1 cloud provider todo: evaluate DeepL, Google Translate, and OpenAI-compatible BYOK adapters. Codex OAuth credentials and future Platform API keys must remain distinct and must never be treated as interchangeable.
+- Rosecr should use the provider-owned Codex OAuth flow and automatic refresh behavior exposed by `pi-ai`, rather than importing credentials from Codex CLI or another application. Browser callback and device-code login should be supported where the library exposes them.
+- Rosecr should inject a custom `pi-ai` credential store backed by OS-protected storage. OAuth credentials stay in the Electron main process and must never be exposed to a renderer, written to ordinary settings files, or included in logs.
+- The `pi-ai` dependency must be pinned to an exact reviewed version and wrapped behind Rosecr's own narrow provider interface because OAuth scopes, model catalogs, and Codex transport requirements can change independently of the app.
+- The Codex provider UI should expose models reported by the signed-in account and only show reasoning-effort values supported by the selected model. Realtime translation should default to the lowest practical reasoning effort to control latency, while allowing the user to choose a higher effort.
+- Rosecr must not silently change the user's selected model or reasoning effort when it becomes unavailable. It should pause translation, preserve the capture setup, and ask the user to choose from the currently reported options. Account limits or usage estimates should be shown only when the provider reports them; Rosecr must not invent a remaining-allowance estimate.
+- The Codex provider should use a stable session identifier for connection reuse and prompt caching, prefer the library's automatic WebSocket/SSE transport selection, and support cancellation when OCR text is superseded by a newer result.
+- The Codex provider should fail clearly when the account, workspace, selected model, transport, or remaining subscription allowance cannot satisfy a request.
 - AI translation should operate on OCR text and nearby context, not on raw screenshots, in the first release. This keeps the privacy model simpler and aligns with the OCR-first architecture.
-- The first release should optimize translation UX for Japanese to English and Japanese to Indonesian, while keeping language selection extensible.
-- The app should be local-first by default. OCR and text preprocessing remain local. Text is sent to cloud providers only when the user enables a cloud provider and selects it for active use.
+- AI translation providers should receive bounded context by default: the five most recent completed source-and-translation units plus a compact terminology glossary learned during the active session. Context should exclude unstable partial OCR updates and should not grow without limit.
+- Only completed, current-generation translations enter session context. Items from the same multi-box batch enter context in visual reading order; cancelled, failed, skipped, low-confidence, and obsolete items never do.
+- The session terminology glossary is advisory rather than authoritative. It is capped at 100 source-target pairs, accepts candidates only from completed stable translations, and does not replace an existing mapping after a single conflicting result. A newer mapping must recur before replacing the older one. The glossary can be viewed only through diagnostics in v1 and can be reset without clearing capture configuration.
+- The context and terminology glossary are session-only, stored in memory, resettable from the UI, and cleared when the active session ends or the user changes the selected game. Screenshots are never included in translation context.
+- Provider adapters that cannot accept context may translate without it, but the router should expose that limitation through provider capabilities rather than silently implying context support.
+- OCR text, nearby context, and glossary entries are untrusted data. The Codex prompt must delimit them from Rosecr's fixed instructions, explicitly forbid following instructions found in captured text, expose no tools, and request only a structured box-ID-to-translation result with no commentary or Markdown. Malformed or extra provider output is rejected rather than displayed.
+- The session translation cache is in-memory, bounded to 500 least-recently-used entries, and cleared on game change, sign-out, or application exit. A cache hit requires matching normalized source text, translation direction, selected model, reasoning effort, prompt version, and context/glossary fingerprint. Correctness takes priority over maximizing cache hits.
+- The first release should optimize translation UX for English to Japanese and Japanese to English, while keeping language selection extensible.
+- The app should be local-first for capture and OCR. Extracted text is sent to Codex only after the user signs in and explicitly presses Play or enables Auto; opening Rosecr, restoring a preset, previewing a region, or running OCR diagnostics must not send text to the provider.
 - Captured text history should be session-only by default. Persistent history, sync, and long-term transcript storage are out of scope for v1.
 - Secrets and tokens should be stored in OS-appropriate secure storage where possible, rather than plain-text config.
+- Default diagnostic logs should contain timestamps, module state transitions, durations, numeric counts, version identifiers, and redacted error codes only. Screenshots, OCR text, translations, prompts, authorization headers, OAuth tokens, and raw provider responses are excluded. A user-initiated support export may include text or images only behind separate unchecked consent controls with a preview of the files being exported.
 - The packaging approach for v1 is a single installer that can download large OCR assets or models during setup or first-run onboarding. This keeps initial distribution manageable while avoiding a multi-step manual install.
+- OCR asset downloads must display their size and version, support retry or resume, verify a published checksum before activation, and keep the previous valid asset set if an update fails. Play and Auto remain disabled until required assets, capture permission, a target, direction, and Codex authentication are ready.
+- First-run onboarding should cover privacy disclosure, OCR asset installation, Codex OAuth, model and reasoning selection, translation direction, game-window selection, capture scope, and a one-shot validation. A successful validation ends with Auto still disabled and explains that enabling Auto begins continuous cloud translation.
 - The architecture should be modularized into the following deep modules:
 - Capture Engine: abstracts screen, region, and window capture plus frame-difference detection.
-- OCR Service: owns preprocessing, `owocr` invocation, text box extraction, confidence data, orientation handling, and reading-order heuristics.
+- OCR Service: owns preprocessing, `owocr` invocation, text box extraction, confidence data, orientation handling, and reading-order heuristics. Electron communicates with the bundled Python sidecar over private stdio using length-delimited typed messages; the sidecar does not expose a localhost port in v1.
+- Sidecar Supervisor: starts the OCR process, performs health checks, enforces request timeouts, and attempts one automatic restart after an unexpected crash. Repeated failure enters a visible stopped state and requires a user retry, preventing a crash loop while preserving capture configuration.
 - Text Tracking Engine: compares OCR outputs across frames, deduplicates stable text, batches changed segments, and decides what needs retranslating.
-- Translation Router: exposes a uniform interface for local MT, cloud MT, and AI providers, including retries, caching, timeouts, and fallback policy.
+- Translation Router: exposes Codex translation through a narrow interface with structured multi-box batching, retries, caching, and timeouts, while leaving a provider slot for post-v1 CAT-Translate, DeepL, Google Translate, and BYOK support.
+- Codex Provider Adapter: wraps the pinned `pi-ai` OpenAI Codex provider, drives OAuth through main-process UI callbacks, discovers account models and reasoning options, submits translation-only streams with no tools, handles cancellation and session reuse, and maps library-specific failures into stable Rosecr errors.
 - Overlay Compositor: maps translated text boxes into overlay UI state, handles positioning, theme, opacity, and collision behavior.
-- Inspect and Dictionary Module: powers manual inspection, word selection, and mini dictionary cards.
-- Settings and Profile Module: persists hotkeys, theme, provider choice, language choice, capture presets, and performance profiles.
-- Auth and Secret Module: handles provider sign-in, BYOK entry, token refresh, and secure storage.
+- Future Inspect and Dictionary Module: a deferred extension point for manual inspection, word selection, and mini dictionary cards.
+- Settings and Profile Module: persists hotkeys, theme, language choice, capture presets, performance profiles, and Codex model settings while treating enabled Auto as non-restorable runtime state.
+- Auth and Secret Module: handles Codex sign-in, token refresh, and secure storage, with an interface that can support future provider credentials.
+- For Codex subscription auth, the Auth and Secret Module supplies an OS-protected credential store to `pi-ai`. Provider-owned code performs token refresh under the credential-store lock, while Rosecr controls encrypted persistence and exposes only non-secret account state to the UI.
 - Diagnostics Module: surfaces provider errors, OCR confidence issues, missing assets, and performance status to the user.
 - Open-source scope for v1 is open core app code and documentation. Provider credentials remain user-managed, and proprietary providers remain replaceable adapters rather than baked-in dependencies.
 
 ## Testing Decisions
 
 - Good tests should verify external behavior and user-visible outcomes, not internal implementation details such as exact helper structure or event sequencing unless those are part of the public contract.
-- Capture tests should verify that fullscreen, region, and active-window modes select the correct area and that unchanged frames do not trigger unnecessary downstream work.
-- OCR pipeline tests should use representative screenshot fixtures covering horizontal and vertical Japanese text, and assert stable box extraction, orientation handling, and cleanup behavior at the interface boundary.
-- Text tracking tests should verify deduplication, change detection, and batching behavior across repeated and partially changed frames.
-- Translation router tests should verify provider selection, timeout handling, fallback behavior, caching, and explicit cloud-routing rules.
-- Overlay compositor tests should verify that translated text is placed against supplied OCR boxes, updates correctly when text changes, and respects core visibility settings.
-- Inspect mode tests should verify that manual selection opens the expected translation view and dictionary card flow from OCR text.
-- Settings tests should verify that hotkeys, profiles, target language, region presets, and theme settings persist and reload correctly.
+- Capture tests should verify that selected-region and whole-game-window modes target the chosen game, remain aligned when that window moves, resizes, crosses mixed-DPI monitors, or changes display mode, persist normalized regions across failures and restarts, reattach after temporary window loss without discarding configuration, pause on minimized or invalid frames, remain idle until Play is pressed or Auto is enabled, perform exactly one translation pass for Play, start continuous scanning directly from Auto, clear one-shot overlays through local source-change watching, cancel pending work when Auto is disabled, exclude Rosecr-owned windows from capture, and do not trigger unnecessary downstream work for unchanged frames.
+- OCR pipeline tests should use representative screenshot fixtures covering horizontal and vertical Japanese text, and assert stable box extraction, confidence classification, orientation handling, and cleanup behavior at the interface boundary.
+- Text tracking tests should verify deduplication, change detection, debounce behavior, two-scan confirmation for uncertain OCR, immediate eligibility for trusted OCR, one-scan disappearance tolerance, removal after two missed scans, immediate clearing on lifecycle resets, batching, and generation ordering across repeated and partially changed frames.
+- Direction and gating tests should verify that the user-selected direction controls routing, eligible source-script text is translated, target-script-only and non-linguistic text remain visually untouched, mixed-language text preserves target-language spans where reliable geometry is available, and no general language detector runs in the realtime path.
+- Translation router tests should verify structured box-ID mapping, the eight-box and character batch limits, visual-order splitting, the two-batch concurrency cap, independent per-item generation validation, cancellation only when an entire batch is obsolete, timeout handling, the single-retry limit, transient versus permanent error classification, retry backoff, complete cache-key matching, cache bounds and clearing, and explicit Codex cloud routing. Multi-provider selection, fallback, and provider-specific contract tests are deferred with those providers.
+- Codex provider tests should verify the pinned `pi-ai` adapter contract, browser and device-code login state transitions, model and reasoning discovery, cancellation, session reuse, buffered streaming completion, automatic token refresh, and recoverable auth, transport, or usage-limit failures using a fake provider implementation.
+- Security tests should verify that Rosecr never reads, logs, or persists raw Codex OAuth tokens, does not silently route Codex-authenticated requests through the Platform API-key endpoint, treats OCR text as delimited untrusted data, exposes no model tools, rejects malformed or additional provider output, and produces a default diagnostic export without screenshots or user text.
+- Context tests should verify the five-unit bound, visual ordering, terminology reuse, the 100-entry glossary cap and conflict rule, exclusion of unstable partial OCR, manual reset, clearing on session or game change, and context-free behavior for providers that do not support it.
+- Overlay compositor tests should verify that translated text is placed against supplied OCR boxes, uses a current captured crop or safe plate for backing, follows the complete collision-resolution order, never truncates or overlaps translations, uses an edge callout when no in-place layout is readable, avoids protected target-language regions where practical, remains click-through and non-focusable, retains and dims the last valid translation during updates, handles the no-prior-translation indicator without obscuring source text, commits completed translations atomically without exposing partial tokens, removes mismatched stale translations after failures, honors reduced motion, and respects visibility without silently disabling Auto.
+- Inspect and dictionary tests are deferred with those features and are not part of the v1 release gate.
+- Settings tests should verify that hotkeys, profiles, target language, durable game targets, normalized region presets, and theme settings persist and reload correctly; hotkey conflicts surface visibly; and active Auto never restores at startup.
 - Auth and secret tests should verify secure credential storage behavior at the module boundary, without asserting OS implementation internals.
-- Installer and onboarding tests should verify first-run flows for downloading OCR assets, enabling providers, and reaching a usable configuration.
-- Integration tests should use mocked translation providers plus real or fixture-based OCR outputs to validate end-to-end behavior from capture event to overlay update.
-- Performance validation should include benchmark-style checks for profile behavior, especially around idle detection, repeated text, and high-frequency overlay updates.
+- Sidecar supervision tests should verify typed stdio framing, health checks, timeout behavior, one automatic restart, crash-loop prevention, and preservation of capture configuration.
+- Installer and onboarding tests should verify resumable and checksum-validated OCR asset downloads, preservation of the previous valid asset set, Codex sign-in, prerequisite gating for Play and Auto, and a successful one-shot validation that leaves Auto disabled.
+- Integration tests should use mocked translation providers plus real or fixture-based OCR outputs to validate end-to-end behavior from capture event to overlay update, including dialogue that grows while a translation is in flight and ensuring stale results never replace newer text.
+- Performance validation should include benchmark-style checks for profile behavior, especially around idle detection, repeated text, high-frequency overlay updates, visible feedback within 500 ms, and completed overlays within the 1.5-second target after text stabilizes.
 - Since the repo is currently greenfield, there is no existing in-repo prior art to mirror yet. The initial test strategy should establish contract tests around module interfaces, fixture-based OCR tests, and end-to-end UI behavior tests as the baseline pattern.
+
+## V1 Release Criteria
+
+- The packaged x64 application completes onboarding and a one-shot Japanese-to-English and English-to-Japanese translation on the supported Windows 11 reference system without requiring a separately installed Python runtime.
+- Region and whole-game-window capture work for windowed and borderless-fullscreen targets, remain aligned after move, resize, DPI, and monitor changes, and never capture Rosecr's own overlays or controller.
+- The evaluation set contains at least 50 representative private or redistributable screenshots from at least three games or equivalent fixtures, including Kiseki-style dialogue, menus, logs, mixed-language UI, horizontal Japanese, vertical Japanese, 1080p, 1440p, and 4K layouts.
+- On that set, clean dialogue, menu, and log text-box detection recall is at least 90%, while target-language-only and non-linguistic regions remain untouched with at least 99% precision. Any threshold adjustment must be recorded with the evaluation results rather than silently weakening the gate.
+- A bilingual review of at least 100 representative source units rates at least 85% as meaning-preserving and usable during play, with no provider commentary, Markdown, prompt-following, or invented UI instructions displayed as translation. Recurring named terms should remain consistent after their glossary mapping stabilizes.
+- Under the reference network, Balanced profile, and default low reasoning setting, translating feedback appears within 500 ms, median completed-overlay latency is at most 1.5 seconds after eligibility, and the 95th percentile is at most 3 seconds. Provider outages are excluded from latency scoring but must exercise the defined error state.
+- Stale or wrong-generation translations never commit in concurrency tests. Overlay layouts contain no translation-to-translation collisions, no silent truncation, and use the documented callout fallback when a readable in-place layout is impossible.
+- Ten minutes of unchanged Auto capture produces zero provider calls after the initial result and averages no more than 5% CPU on the documented reference machine. The benchmark report records hardware, resolution, profile, model, and scan cadence.
+- Default logs and support exports contain no screenshots, OCR text, translations, prompts, raw provider responses, or credentials. Network inspection confirms that only eligible extracted text and bounded text context reach Codex after an explicit Play or Auto action.
+- Capture configuration survives app restart, provider failure, OCR-sidecar crash, and temporary game-window loss. Auto always returns disabled after a fresh Rosecr process start.
+- All contract, fixture, integration, security, packaging, and recovery tests described in this PRD pass against the pinned Electron, Python, `owocr`, and `pi-ai` versions used for the release.
 
 ## Out of Scope
 
 - Native support for macOS and Linux in v1.
+- Windows on ARM and 32-bit Windows builds in v1.
+- Exclusive fullscreen games and whole-desktop capture in v1.
+- Indonesian and language pairs other than English-Japanese in v1.
 - OCR of handwritten Japanese.
 - Audio translation, speech recognition, or subtitle extraction from audio streams.
 - Full document management, library management, or manga reader features.
 - Flashcard export, SRS integration, or learning progress tracking.
 - Persistent cloud sync of user history, settings, or transcripts.
 - Heavy paragraph reconstruction or full document layout understanding for the first release.
+- Exact recreation or licensing of proprietary game fonts, and perfect HDR color fidelity.
 - Full support for every possible anti-cheat or DRM-protected capture scenario.
 - Account systems beyond provider authentication needed for translation access.
 - Community plugin marketplace or third-party extension runtime in v1.
+- Manual inspect mode and dictionary cards in v1.
+- Local/offline CAT-Translate support in v1.
+- DeepL, Google Translate, and OpenAI-compatible BYOK providers in v1.
 
 ## Further Notes
 
@@ -141,8 +255,9 @@ The first release is optimized for Japanese to English and Japanese to Indonesia
 - The main translation risk is provider variability. AI translation may read more naturally, while deterministic MT may be faster and cheaper. The provider abstraction is therefore a product requirement, not just an implementation convenience.
 - The main OCR risk is noisy or stylized text in games and manga. The v1 plan explicitly focuses on robust horizontal and vertical text handling plus reading-aware heuristics, while leaving heavier reconstruction for later iterations.
 - Suggested translation stack for planning purposes:
-- Local/offline-friendly path: start with an embeddable local MT provider such as Argos Translate, understanding that quality may lag premium cloud systems.
-- Premium cloud MT path: DeepL and Google Translate adapters.
-- AI path: OpenAI-compatible text translation, with OpenAI first.
-- A future implementation phase should evaluate whether the capture backend or overlay compositor needs a native Windows helper for lower-latency capture or more reliable overlay behavior than pure Electron can provide alone.
+- Post-v1 local/offline path: evaluate and integrate CAT-Translate as the preferred English-Japanese fallback behind the existing provider contract.
+- Post-v1 premium cloud MT path: evaluate DeepL and Google Translate adapters.
+- Post-v1 API-billed AI path: evaluate an OpenAI-compatible BYOK adapter separate from Codex OAuth.
+- A pre-implementation capture spike should decide whether Electron's capture APIs meet the v1 contract or whether a thin Windows helper is required; this decision must happen before the end-to-end OCR slice, not after release.
 - UI references are documented separately in `docs/ui-direction.md` so the visual direction remains easy to revisit during implementation.
+- The architecture, wireframe, milestone, and todo documents are synchronized to this planning baseline. This PRD remains authoritative if later edits introduce a conflict.

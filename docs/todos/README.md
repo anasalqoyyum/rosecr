@@ -1,22 +1,49 @@
 # Desktop OCR Translator Todos
 
-These are file-backed vertical-slice todos derived from `desktop-ocr-translator-prd.md` using the shared tag `prd:desktop-ocr-translator-prd`.
+These file-backed tracer-bullet slices implement `desktop-ocr-translator-prd.md` under the shared tag `prd:desktop-ocr-translator-prd`.
 
-## Index
+The PRD is authoritative. Each v1 todo must deliver a demoable or independently verifiable user path rather than only one architectural layer.
 
-- `TODO-001` Bootstrap app shell with utility bar and settings persistence
-- `TODO-002` Launch bundled Python sidecar and show OCR health in the app
-- `TODO-003` Select a screen region and preview capture updates
-- `TODO-004` Run OCR on the selected region and render source-aligned debug boxes
-- `TODO-005` Translate changed OCR text through one provider and render overlay text
-- `TODO-006` Add smart idle pause and changed-text deduplication
-- `TODO-007` Support fullscreen and active-window capture from the utility bar
-- `TODO-008` Add performance profiles and advanced scan cadence controls
-- `TODO-009` Add manual inspect mode with focused translation panel
-- `TODO-010` Add mini dictionary cards in inspect mode
-- `TODO-011` Add provider settings with OpenAI BYOK and connection test
-- `TODO-012` Add local/cloud provider switching and explicit routing UI
-- `TODO-013` Add onboarding flow for first-run setup and asset download
-- `TODO-014` Improve overlay theming, opacity, and accessibility controls
-- `TODO-015` Strengthen vertical-text heuristics and reading-order cleanup
-- `TODO-016` Package Windows installer with bundled runtime and recoverable diagnostics
+## V1
+
+- `TODO-001` Bootstrap the safe utility shell and runtime controls
+- `TODO-002` Prove the Windows game-capture and overlay contract
+- `TODO-003` Persist a game target and normalized region
+- `TODO-004` Run supervised local OCR into aligned debug overlays
+- `TODO-005` Deliver Codex OAuth one-shot translation overlays
+- `TODO-006` Add Auto, text tracking, and stale-result protection
+- `TODO-007` Add durable whole-game-window capture and display recovery
+- `TODO-008` Add performance profiles and scan cadence controls
+- `TODO-009` Add structured batching, bounded context, glossary, and cache
+- `TODO-010` Add source replacement and collision-aware layout
+- `TODO-011` Add Codex model, reasoning, account, and error controls
+- `TODO-012` Add privacy-safe diagnostics and model-input hardening
+- `TODO-013` Add checksum-verified onboarding and one-shot validation
+- `TODO-014` Add overlay customization, accessibility, and shortcuts
+- `TODO-015` Strengthen Japanese orientation, cleanup, and direction gating
+- `TODO-016` Package Windows x64 and execute the v1 release gate
+
+## Deferred
+
+- `TODO-017` Add manual inspect mode
+- `TODO-018` Add dictionary cards to inspect mode
+- `TODO-019` Add offline CAT-Translate
+- `TODO-020` Add DeepL, Google Translate, and OpenAI-compatible BYOK
+
+Deferred todos are intentionally excluded from v1 milestones and release criteria.
+
+## Dependency Flow
+
+```text
+001 -> 002 -> 003 -> 004 -> 005 -> 006
+                              |      |-- 009 -> 015
+                              |      |-- 007 -> 008
+                              |      `-- 010 -> 014
+                              `-- 011 -> 012 -> 013
+
+008 + 009 + 010 + 011 + 012 + 013 + 014 + 015 -> 016
+
+005 -> 017 -> 018
+005 -> 019
+011 -> 020
+```
