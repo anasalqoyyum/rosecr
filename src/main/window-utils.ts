@@ -1,12 +1,15 @@
-/** @param {Electron.BrowserWindow} window */
-function nativeHandleDecimal(window) {
+import type { BrowserWindow, WebPreferences } from 'electron';
+
+export function nativeHandleDecimal(window: BrowserWindow): string {
   const buffer = window.getNativeWindowHandle();
   if (buffer.length >= 8) return buffer.readBigUInt64LE(0).toString(10);
   return BigInt(buffer.readUInt32LE(0)).toString(10);
 }
 
-/** @param {string | undefined} preload @param {Partial<Electron.WebPreferences>} overrides */
-function secureWebPreferences(preload, overrides = {}) {
+export function secureWebPreferences(
+  preload?: string,
+  overrides: Partial<WebPreferences> = {}
+): WebPreferences {
   return {
     preload,
     contextIsolation: true,
@@ -18,13 +21,10 @@ function secureWebPreferences(preload, overrides = {}) {
   };
 }
 
-/** @param {Electron.BrowserWindow} window */
-function protectWindow(window) {
+export function protectWindow(window: BrowserWindow): void {
   window.setContentProtection(true);
   window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   window.webContents.on('will-navigate', (event, url) => {
     if (!url.startsWith('file:')) event.preventDefault();
   });
 }
-
-module.exports = { nativeHandleDecimal, protectWindow, secureWebPreferences };

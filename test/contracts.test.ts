@@ -1,9 +1,9 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { parseControlCommand } = require('../src/shared/contracts');
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { parseControlCommand, type ControlCommand } from '../src/shared/contracts';
 
 test('accepts every public control command with a valid payload', () => {
-  const commands = [
+  const commands: ControlCommand[] = [
     { type: 'play' },
     { type: 'set-auto', enabled: true },
     { type: 'set-overlay-visible', visible: false },

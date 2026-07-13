@@ -1,9 +1,16 @@
-/**
- * Convert a physical-pixel client rectangle into Electron DIP bounds by converting both corners.
- * @param {{ left: number, top: number, right: number, bottom: number }} physical
- * @param {(point: Electron.Point) => Electron.Point} screenToDipPoint
- */
-function physicalClientRectToDip(physical, screenToDipPoint) {
+import type { Point, Rectangle } from 'electron';
+
+export interface PhysicalClientRect {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
+
+export function physicalClientRectToDip(
+  physical: PhysicalClientRect,
+  screenToDipPoint: (point: Point) => Point
+): Rectangle {
   const topLeft = screenToDipPoint({ x: physical.left, y: physical.top });
   const bottomRight = screenToDipPoint({ x: physical.right, y: physical.bottom });
   return {
@@ -14,10 +21,7 @@ function physicalClientRectToDip(physical, screenToDipPoint) {
   };
 }
 
-/** @param {{ width: number, height: number }} bounds */
-function markerBounds(bounds) {
+export function markerBounds(bounds: Pick<Rectangle, 'width' | 'height'>): Rectangle {
   const size = Math.max(20, Math.min(72, Math.round(Math.min(bounds.width, bounds.height) * 0.08)));
   return { x: Math.round(bounds.width * 0.08), y: Math.round(bounds.height * 0.1), width: size, height: size };
 }
-
-module.exports = { markerBounds, physicalClientRectToDip };

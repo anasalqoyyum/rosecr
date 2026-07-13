@@ -38,10 +38,10 @@ Milestone 0 is complete. Every milestone exit criterion and both TODO acceptance
 The current verification gate is:
 
 ```text
-npm run typecheck
-npm test
+pnpm run typecheck
+pnpm test
 ```
 
 It covers command validation, runtime state semantics, one-shot versus Auto behavior, visibility independence, waiting/error states, durable settings, Auto reset, shortcut conflicts, owned-window rejection, physical-to-DIP geometry, and invalid/blank-frame rejection.
 
-The final mixed-DPI run moved the deterministic `M0 Mixed-DPI Target` from the 96-DPI primary display to the 120-DPI portrait display. Capture remained running with three received frames. The target client rectangle was `(-961,558)-(-176,1120)` physical pixels and the marker was `x=-768.8, y=446.4, width=628, height=449.6` DIP, exactly matching the 1.25 conversion. Both displays were restored to their original 100% scale afterward and `npm run probe:displays` confirmed scale factor 1.0 on each.
+The final mixed-DPI run moved the deterministic `M0 Mixed-DPI Target` from the 96-DPI primary display to the 120-DPI portrait display. Capture remained running with three received frames. The target client rectangle was `(-961,558)-(-176,1120)` physical pixels and the marker was `x=-768.8, y=446.4, width=628, height=449.6` DIP, exactly matching the 1.25 conversion. Both displays were restored to their original 100% scale afterward and `pnpm run probe:displays` confirmed scale factor 1.0 on each.

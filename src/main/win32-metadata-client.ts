@@ -1,19 +1,44 @@
-const path = require('node:path');
-const readline = require('node:readline');
-const { spawn } = require('node:child_process');
+import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
+import path from 'node:path';
+import readline from 'node:readline';
+import type { NativeWindow } from './capture-source';
+import type { PhysicalClientRect } from './geometry';
 
-class Win32MetadataClient {
-  /** @param {string} applicationRoot */
-  constructor(applicationRoot) {
-    this.applicationRoot = applicationRoot;
-    this.nextRequestId = 1;
-    /** @type {Map<number, { resolve: (value: unknown) => void, reject: (reason: Error) => void, timer: NodeJS.Timeout }>} */
-    this.pending = new Map();
-    /** @type {import('node:child_process').ChildProcessWithoutNullStreams | null} */
-    this.process = null;
-  }
+interface HelperResponse {
+  requestId: number;
+  error?: string;
+}
 
-  start() {
+export interface WindowMetadata extends HelperResponse {
+  exists: boolean;
+  visible: boolean;
+  minimized: boolean;
+  capturable: boolean;
+  dpi: number;
+  foregroundHandle: string;
+  targetIsForeground: boolean;
+  clientRect: PhysicalClientRect | null;
+  timestamp: number;
+}
+
+export interface WindowListResponse extends HelperResponse {
+  windows: NativeWindow[];
+}
+
+interface PendingRequest {
+  resolve(value: HelperResponse): void;
+  reject(reason: Error): void;
+  timer: NodeJS.Timeout;
+}
+
+export class Win32MetadataClient {
+  private nextRequestId = 1;
+  private readonly pending = new Map<number, PendingRequest>();
+  private process: ChildProcessWithoutNullStreams | null = null;
+
+  constructor(private readonly applicationRoot: string) {}
+
+  start(): void {
     if (process.platform !== 'win32') throw new Error('The capture metadata spike requires Windows.');
     if (this.process) return;
     const script = path.join(this.applicationRoot, 'scripts', 'win32-window-metadata.ps1');
@@ -24,17 +49,16 @@ class Win32MetadataClient {
     );
     readline.createInterface({ input: this.process.stdout }).on('line', (line) => this.handleLine(line));
     this.process.once('exit', () => this.failAll(new Error('Win32 metadata helper stopped.')));
-    this.process.stderr.on('data', (data) => {
+    this.process.stderr.on('data', (data: Buffer) => {
       const message = data.toString().trim();
       if (message) this.failAll(new Error(message));
     });
   }
 
-  /** @param {string} line */
-  handleLine(line) {
-    let response;
+  private handleLine(line: string): void {
+    let response: HelperResponse;
     try {
-      response = JSON.parse(line);
+      response = JSON.parse(line) as HelperResponse;
     } catch {
       return;
     }
@@ -46,31 +70,28 @@ class Win32MetadataClient {
     else entry.resolve(response);
   }
 
-  /** @param {Record<string, unknown>} payload */
-  request(payload) {
+  private request<T extends HelperResponse>(payload: Record<string, unknown>): Promise<T> {
     this.start();
     const requestId = this.nextRequestId++;
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(requestId);
         reject(new Error('Win32 metadata query timed out.'));
       }, 1500);
-      this.pending.set(requestId, { resolve, reject, timer });
+      this.pending.set(requestId, { resolve: (value) => resolve(value as T), reject, timer });
       this.process?.stdin.write(`${JSON.stringify({ requestId, ...payload })}\n`);
     });
   }
 
-  /** @param {string} handle */
-  query(handle) {
+  query(handle: string): Promise<WindowMetadata> {
     return this.request({ action: 'query', handle });
   }
 
-  list() {
+  list(): Promise<WindowListResponse> {
     return this.request({ action: 'list' });
   }
 
-  /** @param {Error} error */
-  failAll(error) {
+  private failAll(error: Error): void {
     for (const entry of this.pending.values()) {
       clearTimeout(entry.timer);
       entry.reject(error);
@@ -79,11 +100,9 @@ class Win32MetadataClient {
     this.process = null;
   }
 
-  stop() {
+  stop(): void {
     this.process?.stdin.end();
     this.process?.kill();
     this.process = null;
   }
 }
-
-module.exports = { Win32MetadataClient };

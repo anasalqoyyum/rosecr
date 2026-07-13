@@ -1,50 +1,39 @@
-const path = require('node:path');
-const fs = require('node:fs');
-const {
+import fs from 'node:fs';
+import path from 'node:path';
+import {
   app,
   BrowserWindow,
   globalShortcut,
   ipcMain,
   screen
-} = require('electron');
-const { CaptureCoordinator } = require('./capture-coordinator');
-const {
-  captureFrameReported,
+} from 'electron';
+import { CaptureCoordinator, type CaptureWorkerReport } from './capture-coordinator';
+import {
   createInitialState,
   reduceControlState,
   runtimeError,
   selectTarget,
-  targetUnavailable
-} = require('./control-state');
-const { nativeWindowsToCaptureTargets } = require('./capture-source');
-const { SettingsStore } = require('./settings-store');
-const { ShortcutManager } = require('./shortcut-manager');
-const { Win32MetadataClient } = require('./win32-metadata-client');
-const { protectWindow, secureWebPreferences } = require('./window-utils');
-const { IPC, parseControlCommand } = require('../shared/contracts');
+  type ControlState
+} from './control-state';
+import { nativeWindowsToCaptureTargets } from './capture-source';
+import { SettingsStore, type DurableSettings } from './settings-store';
+import { ShortcutManager } from './shortcut-manager';
+import { Win32MetadataClient } from './win32-metadata-client';
+import { protectWindow, secureWebPreferences } from './window-utils';
+import { IPC, parseControlCommand, type ControlCommand, type ShortcutAction } from '../shared/contracts';
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
-/** @type {Electron.BrowserWindow | null} */
-let utilityWindow = null;
-/** @type {Electron.BrowserWindow | null} */
-let settingsWindow = null;
-/** @type {Electron.BrowserWindow | null} */
-let overlayWindow = null;
-/** @type {Electron.BrowserWindow | null} */
-let captureWindow = null;
-/** @type {CaptureCoordinator | null} */
-let captureCoordinator = null;
-/** @type {ReturnType<SettingsStore['load']>} */
-let durableSettings;
-/** @type {ReturnType<typeof createInitialState>} */
-let state;
-/** @type {SettingsStore} */
-let settingsStore;
-/** @type {ShortcutManager} */
-let shortcutManager;
-/** @type {Win32MetadataClient} */
-let metadataClient;
+let utilityWindow: BrowserWindow | null = null;
+let settingsWindow: BrowserWindow | null = null;
+let overlayWindow: BrowserWindow | null = null;
+let captureWindow: BrowserWindow | null = null;
+let captureCoordinator: CaptureCoordinator | null = null;
+let durableSettings: DurableSettings;
+let state: ControlState;
+let settingsStore: SettingsStore;
+let shortcutManager: ShortcutManager;
+let metadataClient: Win32MetadataClient;
 let quitting = false;
 let smokeEvidenceWritten = false;
 
@@ -54,15 +43,13 @@ function broadcastState() {
   }
 }
 
-/** @param {(current: typeof state) => typeof state} updater */
-function updateState(updater) {
+function updateState(updater: (current: ControlState) => ControlState): void {
   state = updater(state);
   broadcastState();
   writeSmokeEvidence();
 }
 
-/** @param {boolean} [force] */
-function writeSmokeEvidence(force = false) {
+function writeSmokeEvidence(force = false): void {
   const evidencePath = process.env.ROSECR_CAPTURE_EVIDENCE;
   const continuousSmoke = process.env.ROSECR_CAPTURE_CONTINUOUS === '1';
   const probeFailed = state.selectedTarget && (state.status === 'waiting' || state.status === 'error');
@@ -100,7 +87,7 @@ function writeSmokeEvidence(force = false) {
   fs.writeFileSync(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`, 'utf8');
 }
 
-function persistDurableState() {
+function persistDurableState(): void {
   durableSettings = {
     ...durableSettings,
     direction: state.direction,
@@ -111,14 +98,12 @@ function persistDurableState() {
 }
 
 async function listCaptureTargets() {
-  const response = /** @type {any} */ (await metadataClient.list());
-  const windows = /** @type {{ handle: string, title: string, processId: number }[]} */ (response.windows);
-  return nativeWindowsToCaptureTargets(windows, process.pid);
+  const response = await metadataClient.list();
+  return nativeWindowsToCaptureTargets(response.windows, process.pid);
 }
 
-/** @param {import('../shared/contracts').ShortcutAction} action */
-function dispatchShortcut(action) {
-  const commands = {
+function dispatchShortcut(action: ShortcutAction): void {
+  const commands: Record<ShortcutAction, ControlCommand> = {
     play: { type: 'play' },
     auto: { type: 'set-auto', enabled: !state.autoEnabled },
     overlay: { type: 'set-overlay-visible', visible: !state.overlayVisible },
@@ -127,13 +112,12 @@ function dispatchShortcut(action) {
   void dispatchCommand(commands[action]);
 }
 
-function registerShortcuts() {
+function registerShortcuts(): void {
   const shortcutConflicts = shortcutManager.register(durableSettings.shortcuts);
   updateState((current) => ({ ...current, shortcutConflicts }));
 }
 
-/** @param {unknown} rawCommand */
-async function dispatchCommand(rawCommand) {
+async function dispatchCommand(rawCommand: unknown): Promise<ControlState> {
   const command = parseControlCommand(rawCommand);
   state = reduceControlState(state, command);
 
@@ -172,8 +156,7 @@ async function dispatchCommand(rawCommand) {
   return state;
 }
 
-/** @param {unknown} sourceId */
-async function selectCaptureTarget(sourceId) {
+async function selectCaptureTarget(sourceId: unknown): Promise<ControlState> {
   if (typeof sourceId !== 'string') throw new TypeError('Capture source id must be a string.');
   const targets = await listCaptureTargets();
   const target = targets.find((candidate) => candidate.id === sourceId);
@@ -182,7 +165,7 @@ async function selectCaptureTarget(sourceId) {
   return state;
 }
 
-function createWindows() {
+function createWindows(): void {
   const controllerPreload = path.join(__dirname, '..', 'preload', 'controller-preload.js');
   utilityWindow = new BrowserWindow({
     width: 1060,
@@ -263,16 +246,12 @@ function createWindows() {
     screen,
     getState: () => state,
     updateState,
-    captureFrameReported,
-    targetUnavailable,
-    runtimeError,
-    workerStartChannel: IPC.captureWorkerStart,
     workerStopChannel: IPC.captureWorkerStop,
     onGeometryChanged: () => writeSmokeEvidence(true)
   });
 }
 
-function registerIpc() {
+function registerIpc(): void {
   ipcMain.handle(IPC.getState, () => state);
   ipcMain.handle(IPC.command, (_event, command) => dispatchCommand(command));
   ipcMain.handle(IPC.listTargets, () => listCaptureTargets());
@@ -291,17 +270,16 @@ function registerIpc() {
   });
   ipcMain.on(IPC.captureWorkerReport, (event, report) => {
     if (event.sender !== captureWindow?.webContents) return;
-    captureCoordinator?.handleWorkerReport(report);
+    captureCoordinator?.handleWorkerReport(report as CaptureWorkerReport);
   });
 }
 
-async function runSmokeProbe() {
+async function runSmokeProbe(): Promise<void> {
   const targetTitle = process.env.ROSECR_CAPTURE_TARGET;
   if (!targetTitle) return;
   const evidencePath = process.env.ROSECR_CAPTURE_EVIDENCE;
   try {
-    /** @param {string} stage */
-    const writeStage = (stage) => {
+    const writeStage = (stage: string): void => {
       if (evidencePath) fs.writeFileSync(evidencePath, `${JSON.stringify({ stage }, null, 2)}\n`);
     };
     if (evidencePath) {

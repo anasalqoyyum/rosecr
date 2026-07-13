@@ -1,14 +1,14 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const {
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import {
   captureFrameReported,
   createInitialState,
   reduceControlState,
   runtimeError,
   selectTarget,
   targetUnavailable
-} = require('../src/main/control-state');
-const { cloneDefaults } = require('../src/main/settings-store');
+} from '../src/main/control-state';
+import { cloneDefaults } from '../src/main/settings-store';
 
 const target = { id: 'window:42:0', name: 'Game', nativeHandle: '42' };
 

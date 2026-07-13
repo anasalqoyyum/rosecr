@@ -47,15 +47,15 @@ Raw diagnostic JSON is written under `capture-evidence/` by the opt-in smoke env
 ## Reproduction
 
 ```powershell
-npm install
-npm run typecheck
-npm test
+pnpm install
+pnpm run typecheck
+pnpm test
 
 $env:ROSECR_CAPTURE_TARGET='scratch-pad'
 $env:ROSECR_CAPTURE_EVIDENCE="$PWD\capture-evidence\notepad-windowed.json"
-npm start
+pnpm start
 ```
 
-Set `ROSECR_CAPTURE_CONTINUOUS=1` to keep geometry polling active for movement, resize, monitor, minimization, and target-loss checks. `npm run probe:capture` runs the isolated Electron frame spike and expects `ROSECR_CAPTURE_TARGET` to contain part of a visible window title.
+Set `ROSECR_CAPTURE_CONTINUOUS=1` to keep geometry polling active for movement, resize, monitor, minimization, and target-loss checks. `pnpm run probe:capture` runs the isolated Electron frame spike and expects `ROSECR_CAPTURE_TARGET` to contain part of a visible window title.
 
-For a repeatable mixed-DPI run, start `npm run probe:mixed-dpi`, then run the continuous probe with `ROSECR_CAPTURE_TARGET='M0 Mixed-DPI Target'`. The target starts on the primary display, moves to the secondary display after ten seconds, and returns after sixty seconds. Configure different scale factors before the run and restore the original display settings afterward.
+For a repeatable mixed-DPI run, start `pnpm run probe:mixed-dpi`, then run the continuous probe with `ROSECR_CAPTURE_TARGET='M0 Mixed-DPI Target'`. The target starts on the primary display, moves to the secondary display after ten seconds, and returns after sixty seconds. Configure different scale factors before the run and restore the original display settings afterward.

@@ -1,4 +1,4 @@
-const { app, BrowserWindow, screen } = require("electron");
+import { app, BrowserWindow, screen } from 'electron';
 
 app.whenReady().then(() => {
   const primary = screen.getPrimaryDisplay();
@@ -11,12 +11,12 @@ app.whenReady().then(() => {
     height: 480,
     x: primary.workArea.x + 320,
     y: primary.workArea.y + 180,
-    title: "M0 Mixed-DPI Target",
+    title: 'M0 Mixed-DPI Target',
     webPreferences: {
       sandbox: true,
       contextIsolation: true,
-      nodeIntegration: false,
-    },
+      nodeIntegration: false
+    }
   });
 
   window.loadURL(
@@ -30,7 +30,7 @@ app.whenReady().then(() => {
         h1 { margin: 0 0 8px; font-size: 32px; }
         p { margin: 0; color: #a8b4bc; }
       </style>
-      <main><h1>Mixed-DPI capture target</h1><p>Moves between displays without changing content.</p></main>`)};charset=utf-8`,
+      <main><h1>Mixed-DPI capture target</h1><p>Moves between displays without changing content.</p></main>`)};charset=utf-8`
   );
 
   if (!secondary) {
@@ -42,7 +42,7 @@ app.whenReady().then(() => {
       x: secondary.workArea.x + Math.max(24, Math.floor((secondary.workArea.width - 640) / 2)),
       y: secondary.workArea.y + Math.max(24, Math.floor((secondary.workArea.height - 480) / 2)),
       width: 640,
-      height: 480,
+      height: 480
     });
   }, 10_000);
 
@@ -51,9 +51,9 @@ app.whenReady().then(() => {
       x: primary.workArea.x + 320,
       y: primary.workArea.y + 180,
       width: 640,
-      height: 480,
+      height: 480
     });
   }, 60_000);
 });
 
-app.on("window-all-closed", () => app.quit());
+app.on('window-all-closed', () => app.quit());

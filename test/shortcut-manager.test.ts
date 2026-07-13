@@ -1,14 +1,13 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { ShortcutManager } = require('../src/main/shortcut-manager');
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { ShortcutManager } from '../src/main/shortcut-manager';
+import type { ShortcutAction } from '../src/shared/contracts';
 
 test('disabled shortcuts are skipped and OS registration conflicts are surfaced', () => {
-  /** @type {string[]} */
-  const registered = [];
+  const registered: string[] = [];
   let unregisterCount = 0;
   const fakeGlobalShortcut = {
-    /** @param {string} accelerator */
-    register(accelerator) {
+    register(accelerator: string) {
       registered.push(accelerator);
       return accelerator !== 'Ctrl+Alt+O';
     },
@@ -30,10 +29,8 @@ test('disabled shortcuts are skipped and OS registration conflicts are surfaced'
 });
 
 test('shortcut callbacks use the same action dispatch path as the UI', () => {
-  /** @type {Map<string, () => void>} */
-  const callbacks = new Map();
-  /** @type {import('../src/shared/contracts').ShortcutAction[]} */
-  const actions = [];
+  const callbacks = new Map<string, () => void>();
+  const actions: ShortcutAction[] = [];
   const manager = new ShortcutManager(
     {
       register(accelerator, callback) {

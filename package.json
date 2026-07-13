@@ -3,19 +3,25 @@
   "version": "0.0.1",
   "private": true,
   "description": "Windows-first OCR translation overlays for Japanese and English games",
-  "main": "src/main/index.js",
+  "packageManager": "pnpm@10.30.2",
+  "main": "dist/src/main/index.js",
   "scripts": {
-    "start": "electron .",
-    "test": "node --test",
+    "build": "tsc && node dist/scripts/copy-assets.js",
+    "start": "pnpm run build && electron .",
+    "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
-    "probe:sources": "electron scripts/enumerate-electron-sources.js",
-    "probe:capture": "electron scripts/electron-capture-probe.js",
-    "probe:displays": "electron scripts/display-topology.js",
-    "probe:mixed-dpi": "electron scripts/mixed-dpi-target.js"
+    "probe:sources": "pnpm run build && electron dist/scripts/enumerate-electron-sources.js",
+    "probe:capture": "pnpm run build && electron dist/scripts/electron-capture-probe.js",
+    "probe:displays": "pnpm run build && electron dist/scripts/display-topology.js",
+    "probe:mixed-dpi": "pnpm run build && electron dist/scripts/mixed-dpi-target.js"
   },
   "devDependencies": {
     "@types/node": "24.0.15",
     "electron": "43.1.0",
+    "tsx": "4.20.6",
     "typescript": "5.9.2"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "esbuild"]
   }
 }

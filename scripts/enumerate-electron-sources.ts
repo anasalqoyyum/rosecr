@@ -1,4 +1,4 @@
-const { app, desktopCapturer } = require('electron');
+import { app, desktopCapturer } from 'electron';
 
 app.whenReady().then(async () => {
   try {

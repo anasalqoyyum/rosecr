@@ -1,8 +1,8 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { CaptureHealth } = require('../src/main/capture-health');
-const { nativeWindowsToCaptureTargets, parseWindowSourceId, publicCaptureTargets } = require('../src/main/capture-source');
-const { markerBounds, physicalClientRectToDip } = require('../src/main/geometry');
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { CaptureHealth } from '../src/main/capture-health';
+import { nativeWindowsToCaptureTargets, parseWindowSourceId, publicCaptureTargets } from '../src/main/capture-source';
+import { markerBounds, physicalClientRectToDip } from '../src/main/geometry';
 
 const image = { isEmpty: () => true, toDataURL: () => '' };
 
