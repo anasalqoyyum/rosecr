@@ -29,4 +29,4 @@ The PRD is authoritative when planning documents disagree.
 
 ## Status
 
-Planning and documentation only. Implementation has not started.
+Milestone 0 is complete. The Electron utility shell and executable Windows capture spike pass windowed and borderless game capture, exclusion, click-through input, movement, resizing, mixed-DPI and monitor changes, minimization, and target loss. The spike records that production requires a thin native Windows helper for explicit WGC lifecycle, metadata, and device-loss recovery.

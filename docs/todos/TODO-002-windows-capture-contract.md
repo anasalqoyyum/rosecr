@@ -18,11 +18,11 @@ Implement a narrow executable spike that captures one explicitly selected window
 
 ## Acceptance criteria
 
-- [ ] A windowed and borderless-fullscreen test target can produce frames without becoming the foreground window.
-- [ ] Rosecr-owned controller and overlay windows are rejected as targets and excluded from captured frames.
-- [ ] The marker remains aligned after move, resize, monitor, and mixed-DPI changes and never takes focus or mouse input.
-- [ ] Minimized, closed, blank, or uncapturable targets enter a visible waiting state instead of emitting valid-looking frames.
-- [ ] The repository records the chosen backend and evidence against latency, resize, device-loss, exclusion, and alignment requirements.
+- [x] A windowed and borderless-fullscreen test target can produce frames without becoming the foreground window.
+- [x] Rosecr-owned controller and overlay windows are rejected as targets and excluded from captured frames.
+- [x] The marker remains aligned after move, resize, monitor, and mixed-DPI changes and never takes focus or mouse input.
+- [x] Minimized, closed, blank, or uncapturable targets enter a visible waiting state instead of emitting valid-looking frames.
+- [x] The repository records the chosen backend and evidence against latency, resize, device-loss, exclusion, and alignment requirements.
 
 ## Blocked by
 

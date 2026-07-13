@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="ui.css" />
+    <title>Rosecr</title>
+  </head>
+  <body class="utility-body">
+    <main class="utility" aria-label="Rosecr controls">
+      <div class="drag-handle" aria-label="Drag Rosecr">R</div>
+      <button class="play-button" id="play" type="button" aria-label="Run one-shot capture">▶</button>
+      <output class="status" id="status" data-status="idle">Idle</output>
+      <label class="compact-field">
+        <span class="sr-only">Translation direction</span>
+        <select id="direction">
+          <option value="ja-en">日本語 → English</option>
+          <option value="en-ja">English → 日本語</option>
+        </select>
+      </label>
+      <button class="toggle-button" id="overlay" type="button" aria-pressed="true">Overlay</button>
+      <button class="toggle-button" id="auto" type="button" aria-pressed="false">Auto</button>
+      <label class="compact-field">
+        <span class="sr-only">Capture scope</span>
+        <select id="scope">
+          <option value="region">Region</option>
+          <option value="window">Whole window</option>
+        </select>
+      </label>
+      <button class="text-button" id="clear" type="button">Clear</button>
+      <button class="icon-button" id="settings" type="button" aria-label="Open settings">⚙</button>
+    </main>
+    <script src="controller.js"></script>
+  </body>
+</html>

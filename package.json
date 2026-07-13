@@ -1,0 +1,21 @@
+{
+  "name": "rosecr",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Windows-first OCR translation overlays for Japanese and English games",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "typecheck": "tsc --noEmit",
+    "probe:sources": "electron scripts/enumerate-electron-sources.js",
+    "probe:capture": "electron scripts/electron-capture-probe.js",
+    "probe:displays": "electron scripts/display-topology.js",
+    "probe:mixed-dpi": "electron scripts/mixed-dpi-target.js"
+  },
+  "devDependencies": {
+    "@types/node": "24.0.15",
+    "electron": "43.1.0",
+    "typescript": "5.9.2"
+  }
+}

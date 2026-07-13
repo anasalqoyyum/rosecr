@@ -1,0 +1,5 @@
+node_modules/
+coverage/
+capture-evidence/*.json
+capture-evidence/*.png
+capture-evidence/*.webm

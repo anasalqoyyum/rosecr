@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self'" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="ui.css" />
+    <title>Rosecr settings</title>
+  </head>
+  <body class="settings-body">
+    <div class="settings-shell">
+      <nav class="settings-nav" aria-label="Settings sections">
+        <div class="product-name">Rosecr settings</div>
+        <button type="button" data-page="general" aria-current="page">General</button>
+        <button type="button" data-page="capture">Capture</button>
+        <button type="button" data-page="translation">Translation</button>
+        <button type="button" data-page="overlay">Overlay</button>
+        <button type="button" data-page="shortcuts">Shortcuts</button>
+        <button type="button" data-page="diagnostics">Diagnostics</button>
+        <button type="button" data-page="about">About</button>
+      </nav>
+      <main class="settings-content">
+        <section data-section="general">
+          <h1>General</h1>
+          <div class="form-row">
+            <div>
+              <label for="general-direction">Direction</label>
+              <p>Changing direction clears pending work and overlays.</p>
+            </div>
+            <select id="general-direction">
+              <option value="ja-en">Japanese → English</option>
+              <option value="en-ja">English → Japanese</option>
+            </select>
+          </div>
+          <div class="notice">Rosecr always starts idle. Auto is never restored after restart.</div>
+        </section>
+
+        <section data-section="capture" hidden>
+          <h1>Capture</h1>
+          <div class="form-row target-row">
+            <div>
+              <label for="target">Game window</label>
+              <p>Rosecr windows are filtered before this list reaches the renderer.</p>
+            </div>
+            <div class="inline-controls">
+              <select id="target" size="6"><option value="">Choose a window</option></select>
+              <button type="button" id="refresh-targets">Refresh</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <div><label for="capture-scope">Scope</label></div>
+            <select id="capture-scope">
+              <option value="region">Selected region</option>
+              <option value="window">Whole game window</option>
+            </select>
+          </div>
+          <div class="probe-actions">
+            <button class="primary-button" type="button" id="start-probe">Start capture probe</button>
+            <button type="button" id="stop-probe">Stop</button>
+          </div>
+          <div class="notice" id="capture-status">Choose a window to run the M0 capture probe.</div>
+        </section>
+
+        <section data-section="translation" hidden>
+          <h1>Translation</h1>
+          <div class="notice">Codex account controls begin in Milestone 2. M0 validates shell semantics only.</div>
+        </section>
+
+        <section data-section="overlay" hidden>
+          <h1>Overlay</h1>
+          <div class="form-row">
+            <div>
+              <label for="overlay-visible">Visibility</label>
+              <p>Visibility remains independent from Auto.</p>
+            </div>
+            <input type="checkbox" id="overlay-visible" />
+          </div>
+          <div class="notice">The M0 marker is passive, non-focusable, click-through, and excluded from capture.</div>
+        </section>
+
+        <section data-section="shortcuts" hidden>
+          <h1>Shortcuts</h1>
+          <p class="section-copy">Leave a shortcut empty to disable it. Registration conflicts remain visible.</p>
+          <div id="shortcut-fields"></div>
+        </section>
+
+        <section data-section="diagnostics" hidden>
+          <h1>Diagnostics</h1>
+          <dl class="diagnostics-list">
+            <div><dt>Runtime</dt><dd id="diagnostic-state">Idle</dd></div>
+            <div><dt>Target</dt><dd id="diagnostic-target">Not selected</dd></div>
+            <div><dt>Frames</dt><dd id="diagnostic-frames">0</dd></div>
+            <div><dt>First frame</dt><dd id="diagnostic-latency">—</dd></div>
+            <div><dt>Frame size</dt><dd id="diagnostic-size">—</dd></div>
+            <div><dt>Backend decision</dt><dd>Thin native Windows helper required</dd></div>
+          </dl>
+          <div class="notice">Electron supplies capture and exclusion primitives. Production geometry, target lifecycle, and explicit WGC device-loss recovery require the helper.</div>
+        </section>
+
+        <section data-section="about" hidden>
+          <h1>About</h1>
+          <p class="section-copy">Rosecr 0.0.1 · Milestone 0 Windows foundation</p>
+          <p class="section-copy">No OCR, credentials, providers, or Milestone 1 capture persistence are included.</p>
+        </section>
+      </main>
+    </div>
+    <script src="settings.js"></script>
+  </body>
+</html>
