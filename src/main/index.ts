@@ -22,7 +22,8 @@ import { Win32MetadataClient } from './win32-metadata-client';
 import { protectWindow, secureWebPreferences } from './window-utils';
 import { IPC, parseControlCommand, type ControlCommand, type ShortcutAction } from '../shared/contracts';
 
-if (!app.requestSingleInstanceLock()) app.quit();
+const hasSingleInstanceLock = app.requestSingleInstanceLock();
+if (!hasSingleInstanceLock) app.quit();
 
 let utilityWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
@@ -162,6 +163,7 @@ async function selectCaptureTarget(sourceId: unknown): Promise<ControlState> {
   const target = targets.find((candidate) => candidate.id === sourceId);
   if (!target) throw new Error('The selected window is no longer available or belongs to Rosecr.');
   updateState((current) => selectTarget(current, target));
+  if (state.autoEnabled) await captureCoordinator?.start('continuous');
   return state;
 }
 
@@ -315,28 +317,30 @@ async function runSmokeProbe(): Promise<void> {
   }
 }
 
-app.whenReady().then(() => {
-  settingsStore = new SettingsStore(app.getPath('userData'));
-  metadataClient = new Win32MetadataClient(app.getAppPath());
-  durableSettings = settingsStore.load();
-  state = createInitialState(durableSettings);
-  createWindows();
-  shortcutManager = new ShortcutManager(globalShortcut, dispatchShortcut);
-  registerIpc();
-  registerShortcuts();
-  if (process.env.ROSECR_CAPTURE_TARGET) setTimeout(() => void runSmokeProbe(), 2000);
-});
+if (hasSingleInstanceLock) {
+  app.whenReady().then(() => {
+    settingsStore = new SettingsStore(app.getPath('userData'));
+    metadataClient = new Win32MetadataClient(app.getAppPath());
+    durableSettings = settingsStore.load();
+    state = createInitialState(durableSettings);
+    createWindows();
+    shortcutManager = new ShortcutManager(globalShortcut, dispatchShortcut);
+    registerIpc();
+    registerShortcuts();
+    if (process.env.ROSECR_CAPTURE_TARGET) setTimeout(() => void runSmokeProbe(), 2000);
+  });
 
-app.on('second-instance', () => {
-  utilityWindow?.show();
-  utilityWindow?.focus();
-});
+  app.on('second-instance', () => {
+    utilityWindow?.show();
+    utilityWindow?.focus();
+  });
 
-app.on('before-quit', () => {
-  quitting = true;
-  captureCoordinator?.stop();
-});
+  app.on('before-quit', () => {
+    quitting = true;
+    captureCoordinator?.stop();
+  });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+  app.on('will-quit', () => globalShortcut.unregisterAll());
 
-app.on('window-all-closed', () => app.quit());
+  app.on('window-all-closed', () => app.quit());
+}
