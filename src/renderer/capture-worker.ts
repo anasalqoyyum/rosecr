@@ -23,9 +23,11 @@ type FrameWorkerReport = Extract<WorkerReport, { kind: 'frame' }>;
   let frameCount = 0;
   let lastReportAt = 0;
   let stopRequested = false;
+  let workerGeneration = 0;
 
   function stopCapture(): void {
     stopRequested = true;
+    workerGeneration++;
     if (stream) for (const track of stream.getTracks()) track.stop();
     stream = null;
     video.srcObject = null;
@@ -47,34 +49,38 @@ type FrameWorkerReport = Extract<WorkerReport, { kind: 'frame' }>;
     return mean < 1 && variance < 0.5;
   }
 
-  function reportFrame(now: number): void {
+  function reportFrame(now: number, captureGeneration: number | undefined): void {
     frameCount += 1;
     if (frameCount !== 1 && now - lastReportAt < 250) return;
     lastReportAt = now;
     window.captureProbe.report({
-      kind: 'frame', frameCount,
+      kind: 'frame', captureGeneration, frameCount,
       firstFrameLatencyMs: frameCount === 1 ? Math.round(performance.now() - startedAt) : undefined,
       width: video.videoWidth, height: video.videoHeight, blank: isBlankFrame(), timestamp: Date.now()
     });
   }
 
-  function watchFrames(): void {
-    if (stopRequested || !stream) return;
+  function watchFrames(generation: number, captureGeneration: number | undefined): void {
+    if (generation !== workerGeneration || stopRequested || !stream) return;
     if (typeof video.requestVideoFrameCallback === 'function') {
       video.requestVideoFrameCallback((now) => {
-        reportFrame(now);
-        watchFrames();
+        if (generation !== workerGeneration || stopRequested) return;
+        reportFrame(now, captureGeneration);
+        watchFrames(generation, captureGeneration);
       });
     } else {
       requestAnimationFrame((now) => {
-        reportFrame(now);
-        watchFrames();
+        if (generation !== workerGeneration || stopRequested) return;
+        reportFrame(now, captureGeneration);
+        watchFrames(generation, captureGeneration);
       });
     }
   }
 
   async function startCapture(options: WorkerStartOptions): Promise<FrameWorkerReport> {
     stopCapture();
+    const generation = workerGeneration;
+    const captureGeneration = options.captureGeneration;
     stopRequested = false;
     frameCount = 0;
     lastReportAt = 0;
@@ -87,20 +93,26 @@ type FrameWorkerReport = Extract<WorkerReport, { kind: 'frame' }>;
           maxFrameRate: options.frameRate ?? 60
         }
       } as MediaTrackConstraints;
-      stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: desktopConstraints });
+      const acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: false, video: desktopConstraints });
+      if (generation !== workerGeneration) {
+        for (const track of acquiredStream.getTracks()) track.stop();
+        throw new Error('Capture startup was cancelled.');
+      }
+      stream = acquiredStream;
       const track = stream.getVideoTracks()[0];
-      track.addEventListener('ended', () => window.captureProbe.report({ kind: 'ended', timestamp: Date.now() }));
-      track.addEventListener('mute', () => window.captureProbe.report({ kind: 'muted', timestamp: Date.now() }));
+      track.addEventListener('ended', () => window.captureProbe.report({ kind: 'ended', captureGeneration, timestamp: Date.now() }));
+      track.addEventListener('mute', () => window.captureProbe.report({ kind: 'muted', captureGeneration, timestamp: Date.now() }));
       video.srcObject = stream;
       await video.play();
-      watchFrames();
+      if (generation !== workerGeneration) throw new Error('Capture startup was cancelled.');
+      watchFrames(generation, captureGeneration);
       return {
-        kind: 'frame', frameCount: 1,
+        kind: 'frame', captureGeneration, frameCount: 1,
         firstFrameLatencyMs: Math.round(performance.now() - startedAt),
         width: video.videoWidth, height: video.videoHeight, blank: isBlankFrame(), timestamp: Date.now()
       };
     } catch (error) {
-      window.captureProbe.report({ kind: 'error', message: error instanceof Error ? error.message : String(error), timestamp: Date.now() });
+      window.captureProbe.report({ kind: 'error', captureGeneration, message: error instanceof Error ? error.message : String(error), timestamp: Date.now() });
       throw error;
     }
   }

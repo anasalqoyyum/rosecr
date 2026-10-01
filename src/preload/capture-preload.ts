@@ -5,6 +5,7 @@ import type { CaptureWorkerReport } from '../main/capture-coordinator';
 export interface CaptureStartOptions {
   sourceId: string;
   frameRate?: number;
+  captureGeneration?: number;
 }
 
 contextBridge.exposeInMainWorld(

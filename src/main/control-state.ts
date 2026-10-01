@@ -80,8 +80,8 @@ export function runtimeError(state: ControlState, reason: string): ControlState 
   return { ...state, status: 'error', statusMessage: `Error: ${reason}`, autoEnabled: false, captureProbe: { ...state.captureProbe, active: false }, clearGeneration: state.clearGeneration + 1 };
 }
 
-export function captureFrameReported(state: ControlState, report: CaptureFrameReport): ControlState {
-  const oneShotFinished = !state.autoEnabled && report.frameCount >= 1;
+export function captureFrameReported(state: ControlState, report: CaptureFrameReport, mode: 'one-shot' | 'continuous' = state.autoEnabled ? 'continuous' : 'one-shot'): ControlState {
+  const oneShotFinished = mode === 'one-shot' && report.frameCount >= 1;
   return {
     ...state,
     status: oneShotFinished ? 'idle' : 'running',

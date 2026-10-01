@@ -121,6 +121,7 @@ function registerShortcuts(): void {
 async function dispatchCommand(rawCommand: unknown): Promise<ControlState> {
   const command = parseControlCommand(rawCommand);
   state = reduceControlState(state, command);
+  broadcastState();
 
   switch (command.type) {
     case 'play':
@@ -162,6 +163,7 @@ async function selectCaptureTarget(sourceId: unknown): Promise<ControlState> {
   const targets = await listCaptureTargets();
   const target = targets.find((candidate) => candidate.id === sourceId);
   if (!target) throw new Error('The selected window is no longer available or belongs to Rosecr.');
+  captureCoordinator?.stop();
   updateState((current) => selectTarget(current, target));
   if (state.autoEnabled) await captureCoordinator?.start('continuous');
   return state;
@@ -182,6 +184,10 @@ function createWindows(): void {
     backgroundColor: '#0f0f0f',
     title: 'Rosecr',
     webPreferences: secureWebPreferences(controllerPreload)
+  });
+  utilityWindow.on('closed', () => {
+    utilityWindow = null;
+    app.quit();
   });
   protectWindow(utilityWindow);
   utilityWindow.loadFile(path.join(__dirname, '..', 'renderer', 'controller.html'));
