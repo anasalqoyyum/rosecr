@@ -9,12 +9,16 @@ import type { ControlState } from '../src/main/control-state';
 import { cloneDefaults } from '../src/main/settings-store';
 import { IPC } from '../src/shared/contracts';
 
-function loadMain(hasLock = true, queryGate?: Promise<void>) {
+function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
+  smoke?: boolean;
+  workerGate?: Promise<void>;
+} = {}) {
   const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<ControlState>>();
   const listeners = new Map<string, () => void>();
   const starts: string[] = [];
   const stops: string[] = [];
   const windows: FakeWindow[] = [];
+  const timers = new Map<number, () => void>();
   let activeSource: string | null = null;
   let quitCalls = 0;
   let readyCalls = 0;
@@ -43,6 +47,7 @@ function loadMain(hasLock = true, queryGate?: Promise<void>) {
         const match = /"sourceId":"([^"]+)"/.exec(script);
         assert.ok(match);
         activeSource = match[1];
+        await options.workerGate;
         return { kind: 'frame', captureGeneration: JSON.parse(script.slice(script.indexOf('(') + 1, -1)).captureGeneration, blank: false, frameCount: 1, width: 800, height: 600, timestamp: Date.now() };
       }
     };
@@ -67,7 +72,8 @@ function loadMain(hasLock = true, queryGate?: Promise<void>) {
   runInNewContext(code, {
     exports: {},
     __dirname: path.dirname(filename),
-    process: { env: {}, pid: process.pid },
+    process: { env: options.smoke ? { ROSECR_CAPTURE_TARGET: 'Game' } : {}, pid: process.pid },
+    setTimeout: (callback: () => void, delay: number) => { timers.set(delay, callback); },
     require: (id: string): unknown => {
       switch (id) {
         case 'electron': return {
@@ -96,7 +102,7 @@ function loadMain(hasLock = true, queryGate?: Promise<void>) {
           screen: { screenToDipPoint: (point: unknown) => point }
         };
         case './settings-store': return {
-          SettingsStore: class { load() { return cloneDefaults(); } }
+          SettingsStore: class { load() { return cloneDefaults(); } save() {} }
         };
         case './win32-metadata-client': return {
           Win32MetadataClient: class {
@@ -115,7 +121,7 @@ function loadMain(hasLock = true, queryGate?: Promise<void>) {
   });
 
   return {
-    startup, handlers, listeners, starts, stops, windows,
+    startup, handlers, listeners, starts, stops, windows, timers,
     get activeSource() { return activeSource; },
     get quitCalls() { return quitCalls; },
     get readyCalls() { return readyCalls; },
@@ -207,4 +213,65 @@ test('closing the controller quits even while hidden windows remain', async (t) 
   assert.equal(main.quitCalls, 1);
   assert.equal(main.windows.length, 4);
   assert.doesNotThrow(() => main.listeners.get('second-instance')?.());
+});
+
+
+test('Stop disables Auto and terminates the shared capture', async (t) => {
+  const main = loadMain();
+  t.after(() => main.dispose());
+  await main.startup;
+  await main.invoke(IPC.selectTarget, 'window:42:0');
+  await main.invoke(IPC.command, { type: 'set-auto', enabled: true });
+  const state = await main.invoke(IPC.stopCaptureProbe);
+  assert.equal(state.autoEnabled, false);
+  assert.equal(state.status, 'idle');
+  assert.equal(state.captureProbe.active, false);
+  assert.equal(main.activeSource, null);
+  assert.equal(main.windows[2].visible, false);
+  assert.equal(main.windows[0].broadcasts.at(-1)?.autoEnabled, false);
+});
+
+test('direction and scope changes refresh visible Auto output while Auto-off changes stay idle', async (t) => {
+  const main = loadMain();
+  t.after(() => main.dispose());
+  await main.startup;
+  await main.invoke(IPC.selectTarget, 'window:42:0');
+  await main.invoke(IPC.command, { type: 'set-auto', enabled: true });
+  for (const command of [{ type: 'set-direction', direction: 'en-ja' }, { type: 'set-scope', scope: 'window' }]) {
+    const startCount = main.starts.length;
+    const state = await main.invoke(IPC.command, command);
+    assert.equal(main.starts.length, startCount + 1);
+    assert.equal(state.autoEnabled, true);
+    assert.equal(state.captureProbe.active, true);
+    assert.equal(main.windows[2].visible, true);
+  }
+  await main.invoke(IPC.command, { type: 'set-auto', enabled: false });
+  const startCount = main.starts.length;
+  await main.invoke(IPC.command, { type: 'set-direction', direction: 'ja-en' });
+  await main.invoke(IPC.command, { type: 'set-scope', scope: 'region' });
+  assert.equal(main.starts.length, startCount);
+  assert.equal(main.windows[2].visible, false);
+});
+
+test('smoke timeout stops capture and a late first frame cannot replace the error', async (t) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const main = loadMain(true, undefined, { smoke: true, workerGate: gate });
+  t.after(() => main.dispose());
+  await main.startup;
+  main.timers.get(2000)!();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(main.activeSource, 'window:42:0');
+  main.timers.get(10000)!();
+  const timedOut = await main.invoke(IPC.getState);
+  assert.equal(main.activeSource, null);
+  assert.equal(timedOut.status, 'error');
+  assert.equal(timedOut.statusMessage, 'Error: capture probe timed out before the first frame');
+  release();
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const state = await main.invoke(IPC.getState);
+  assert.equal(state.status, 'error');
+  assert.equal(state.captureProbe.active, false);
+  assert.equal(state.captureProbe.frameCount, 0);
+  assert.equal(main.windows[2].visible, false);
 });

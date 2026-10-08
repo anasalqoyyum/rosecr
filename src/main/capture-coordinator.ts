@@ -159,7 +159,10 @@ export class CaptureCoordinator {
         this.updateState((state) => targetUnavailable(state, health.reason));
         return;
       }
-      if (report.width !== rect.right - rect.left || report.height !== rect.bottom - rect.top) return;
+      // Electron frames and Win32 client bounds can differ by one physical pixel.
+      if (Math.abs(report.width - (rect.right - rect.left)) > 1 ||
+          Math.abs(report.height - (rect.bottom - rect.top)) > 1) return;
+      if (this.mode === 'one-shot' && report.blank) return;
       this.overlayReady = this.getState().clearGeneration === this.outputClearGeneration;
       if (this.overlayReady && this.getState().overlayVisible && !this.overlayWindow.isVisible()) this.overlayWindow.showInactive();
       this.updateState((state) => captureFrameReported(state, report, this.mode));

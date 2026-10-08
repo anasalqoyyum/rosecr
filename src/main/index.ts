@@ -142,6 +142,7 @@ async function dispatchCommand(rawCommand: unknown): Promise<ControlState> {
     case 'set-scope':
       persistDurableState();
       overlayWindow?.hide();
+      if (state.autoEnabled && state.selectedTarget) await captureCoordinator?.start('continuous');
       break;
     case 'open-settings':
       settingsWindow?.show();
@@ -273,7 +274,7 @@ function registerIpc(): void {
   });
   ipcMain.handle(IPC.stopCaptureProbe, () => {
     captureCoordinator?.stop();
-    updateState((current) => ({ ...current, status: 'idle', statusMessage: 'Idle' }));
+    updateState((current) => reduceControlState(current, { type: 'set-auto', enabled: false }));
     return state;
   });
   ipcMain.on(IPC.captureWorkerReport, (event, report) => {
@@ -311,6 +312,7 @@ async function runSmokeProbe(): Promise<void> {
     writeStage('capture-starting');
     setTimeout(() => {
       if (state.captureProbe.frameCount === 0 && state.selectedTarget?.id === target.id) {
+        captureCoordinator?.stop();
         updateState((current) => runtimeError(current, 'capture probe timed out before the first frame'));
       }
     }, 10000);

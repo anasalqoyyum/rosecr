@@ -142,9 +142,9 @@ test('geometry changes hide output until a fresh matching frame, including movem
     const width = next.clientRect!.right - next.clientRect!.left;
     f.frame({ width, timestamp: Date.now() - 1 });
     assert.equal(f.visible, false);
-    f.frame({ width: width + 1 });
+    f.frame({ width: width + 2 });
     assert.equal(f.visible, false);
-    f.frame({ width });
+    f.frame({ width: width + 1 });
     assert.equal(f.visible, true);
   }
 });
@@ -183,4 +183,54 @@ test('a pending polling query cannot stop or move the replacement capture', asyn
   assert.equal(f.coordinator.getEvidence().metadata?.clientRect?.left, 100);
   f.frame({ captureGeneration: 1, kind: 'frame', blank: true });
   assert.equal(f.state.status, 'running');
+});
+
+
+test('one-shot accepts a one-pixel rounding offset and rejects larger dimension differences', async (t) => {
+  for (const [clientWidth, frameWidth] of [[1263, 1264], [1049, 1050], [800, 799]]) {
+    const f = fixture();
+    t.after(() => f.coordinator.stop());
+    f.setQuery(async () => metadata(0, clientWidth));
+    await f.coordinator.start('one-shot');
+    f.frame({ width: frameWidth + (frameWidth > clientWidth ? 1 : -1) });
+    f.frame({ width: frameWidth, height: 602 });
+    assert.equal(f.state.captureProbe.frameCount, 0);
+    assert.equal(f.visible, false);
+    f.frame({ width: frameWidth, height: 601 });
+    assert.equal(f.visible, true);
+    assert.equal(f.state.statusMessage, 'Idle · capture probe passed');
+    assert.equal(f.state.captureProbe.frameCount, 1);
+    assert.equal(f.state.captureProbe.active, false);
+  }
+});
+
+test('one-shot keeps sampling blank frames until a nonblank frame completes capture', async (t) => {
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  await f.coordinator.start('one-shot');
+  for (const frameCount of [1, 2]) {
+    f.frame({ blank: true, frameCount });
+    assert.equal(f.visible, false);
+    assert.equal(f.state.captureProbe.frameCount, 0);
+  }
+  f.frame({ frameCount: 3 });
+  assert.equal(f.visible, true);
+  assert.equal(f.state.statusMessage, 'Idle · capture probe passed');
+  assert.equal(f.state.captureProbe.frameCount, 3);
+  f.frame({ blank: true, frameCount: 4 });
+  assert.equal(f.state.captureProbe.frameCount, 3);
+});
+
+test('three blank one-shot samples enter waiting without showing or passing capture', async (t) => {
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  await f.coordinator.start('one-shot');
+  for (const frameCount of [1, 2, 3]) f.frame({ blank: true, frameCount });
+  assert.equal(f.state.status, 'waiting');
+  assert.equal(f.state.statusMessage, 'Waiting: target emitted repeated blank frames');
+  assert.equal(f.state.captureProbe.frameCount, 0);
+  assert.equal(f.visible, false);
+  f.frame({ frameCount: 4 });
+  assert.equal(f.state.status, 'waiting');
+  assert.equal(f.state.captureProbe.frameCount, 0);
 });
