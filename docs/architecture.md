@@ -17,7 +17,7 @@ This document maps `desktop-ocr-translator-prd.md` to an implementation-ready Wi
 - Capture: selected region within a chosen game or the whole chosen game window
 - Game modes: windowed and borderless fullscreen
 - Languages: Japanese to English and English to Japanese
-- OCR: bundled Python runtime and `owocr`
+- OCR: bundled Python runtime, RapidOCR, and PP-OCR models
 - Translation: Codex subscription OAuth through pinned `@earendil-works/pi-ai`
 - Overlay: click-through source replacement
 
@@ -32,7 +32,7 @@ Rosecr has two runtimes:
 
 Electron owns orchestration, capture, windows, state, translation, auth, secure storage, settings, diagnostics, and overlay composition.
 
-Python owns image preprocessing, `owocr`, OCR confidence and geometry, orientation, and Japanese reading-order cleanup.
+Python owns image preprocessing, RapidOCR, OCR confidence and geometry, orientation, and Japanese reading-order cleanup.
 
 Renderer processes never communicate directly with Python, credentials, or the model provider.
 
@@ -97,10 +97,11 @@ Responsibilities:
 - Launch the bundled Python process.
 - Exchange length-delimited typed messages over private stdio.
 - Track health and request timeouts.
-- Attempt one automatic restart after an unexpected crash.
+- Attempt one automatic restart after an unexpected crash. Five minutes of healthy uptime earns the restart back.
 - Stop with an actionable error after repeated failure.
+- Keep one request in flight. A frame that arrives meanwhile waits in a single slot and is sent next; a newer frame replaces it.
 
-V1 exposes no localhost OCR port.
+V1 exposes no localhost OCR port. `docs/ocr-sidecar.md` documents the protocol and supervisor behavior.
 
 ### OCR Service
 

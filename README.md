@@ -9,7 +9,7 @@ Rosecr targets a selected game window in windowed or borderless-fullscreen mode,
 - Windows 11 x64 primary target
 - Selected region or whole selected game window
 - Japanese to English and English to Japanese
-- Local `owocr` processing through a bundled Python sidecar
+- Local RapidOCR processing with PP-OCR models through a bundled Python sidecar
 - Codex subscription OAuth through a pinned `@earendil-works/pi-ai` adapter
 - Source-replacement overlays with stale-result protection and collision handling
 - No game injection, memory reading, or text hooks
@@ -25,17 +25,20 @@ Exclusive fullscreen, whole-desktop capture, manual inspect, dictionary cards, o
 - [Design foundation](docs/design-foundation.html), with tokens in [DESIGN.md](DESIGN.md) and product context in [PRODUCT.md](PRODUCT.md)
 - [Implementation milestones](docs/milestones.md)
 - [Vertical-slice todos](docs/todos/README.md)
+- [OCR sidecar](docs/ocr-sidecar.md)
 
 The PRD is authoritative when planning documents disagree.
 
 ## Development
 
-Rosecr uses TypeScript and pnpm 10.
+Rosecr uses TypeScript and pnpm 10. The OCR sidecar uses Python 3.12 through uv; see [OCR sidecar](docs/ocr-sidecar.md).
 
 ```powershell
 pnpm install
+uv sync --directory sidecar
 pnpm run typecheck
 pnpm test
+pnpm test:ocr
 pnpm start
 ```
 

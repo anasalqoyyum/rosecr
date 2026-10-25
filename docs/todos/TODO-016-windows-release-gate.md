@@ -22,7 +22,7 @@ Produce the Windows 11 x64 tester package with bundled runtimes and execute ever
 - [ ] Region and whole-window capture, both language directions, Codex OAuth, one-shot, Auto, overlay replacement, recovery, and startup-idle behavior work in the packaged app.
 - [ ] The documented 50-screenshot OCR/gating evaluation and 100-unit bilingual review meet the PRD thresholds.
 - [ ] Balanced latency, idle CPU, zero-idle-provider-call, collision, stale-generation, privacy, persistence, and recovery gates pass with recorded evidence.
-- [ ] Every contract, fixture, integration, security, packaging, and recovery test passes against the exact Electron, Python, `owocr`, and `pi-ai` versions in the package.
+- [ ] Every contract, fixture, integration, security, packaging, and recovery test passes against the exact Electron, Python, RapidOCR, OCR model, and `pi-ai` versions in the package.
 
 ## Blocked by
 

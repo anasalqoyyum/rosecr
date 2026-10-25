@@ -8,7 +8,7 @@ The primary v1 experience is continuous game translation. The user targets eithe
 
 ## Solution
 
-Build a Windows-first desktop application using Electron for the shell, overlay UI, settings, and desktop integration, plus a bundled Python sidecar for OCR and Japanese-specific text processing using `owocr`. The app captures either a selected region within a game or the entire selected game window; detects when visible Japanese text changes; runs OCR locally; translates the extracted text through the user's Codex subscription; and renders translated text in place over the original text boxes.
+Build a Windows-first desktop application using Electron for the shell, overlay UI, settings, and desktop integration, plus a bundled Python sidecar for OCR and Japanese-specific text processing using RapidOCR with PP-OCR models. The app captures either a selected region within a game or the entire selected game window; detects when visible Japanese text changes; runs OCR locally; translates the extracted text through the user's Codex subscription; and renders translated text in place over the original text boxes.
 
 By default, each translated overlay should conceal the original Japanese using a blurred or opaque backing treatment derived from or visually compatible with the surrounding game UI, then render the translation inside the same approximate area. When an exact replacement would make the translation unreadable or would cover important UI, the compositor may expand or reposition the translated area according to predictable placement rules.
 
@@ -99,7 +99,7 @@ The first release prioritizes the English-Japanese language pair in both directi
 
 - The desktop shell will be Electron-based. Electron owns window lifecycle, transparent overlay windows, hotkeys, settings UI, installer flow, and system integration.
 - OCR will run in a local Python sidecar process. The sidecar will be bundled and launched by the Electron app, rather than requiring the user to manually run Python.
-- The OCR engine for v1 is `owocr`, with Japanese-aware preprocessing and reading-order heuristics handled in the Python sidecar.
+- The OCR engine for v1 is RapidOCR on onnxruntime with bundled PP-OCR models, called directly from the Python sidecar, with Japanese-aware preprocessing and reading-order heuristics handled in the sidecar. V1 does not use `owocr`: its results carry no confidence, which the low-confidence eligibility rule needs, and it is licensed GPL-3.0-only. `docs/ocr-sidecar.md` records the evaluation.
 - The primary v1 platform is 64-bit Windows 11. Windows 10 version 2004 or newer may be supported where the pinned Electron, Python, OCR, and capture stack remains compatible, but Windows 10 is not allowed to weaken the Windows 11 release gate. Windows on ARM, 32-bit Windows, macOS, and Linux are deferred.
 - Capture scope in v1 includes a selected region within a chosen game window and the entire chosen game window. The target remains pinned to that game rather than silently following whichever application becomes active.
 - Windowed and borderless-fullscreen games are supported capture environments for v1. Exclusive fullscreen and whole-desktop capture are not v1 requirements.
@@ -180,8 +180,8 @@ The first release prioritizes the English-Japanese language pair in both directi
 - First-run onboarding should cover privacy disclosure, OCR asset installation, Codex OAuth, model and reasoning selection, translation direction, game-window selection, capture scope, and a one-shot validation. A successful validation ends with Auto still disabled and explains that enabling Auto begins continuous cloud translation.
 - The architecture should be modularized into the following deep modules:
 - Capture Engine: abstracts screen, region, and window capture plus frame-difference detection.
-- OCR Service: owns preprocessing, `owocr` invocation, text box extraction, confidence data, orientation handling, and reading-order heuristics. Electron communicates with the bundled Python sidecar over private stdio using length-delimited typed messages; the sidecar does not expose a localhost port in v1.
-- Sidecar Supervisor: starts the OCR process, performs health checks, enforces request timeouts, and attempts one automatic restart after an unexpected crash. Repeated failure enters a visible stopped state and requires a user retry, preventing a crash loop while preserving capture configuration.
+- OCR Service: owns preprocessing, OCR engine invocation, text box extraction, confidence data, orientation handling, and reading-order heuristics. Electron communicates with the bundled Python sidecar over private stdio using length-delimited typed messages; the sidecar does not expose a localhost port in v1.
+- Sidecar Supervisor: starts the OCR process, performs health checks, enforces request timeouts, and attempts one automatic restart after an unexpected crash. The restart becomes available again after the sidecar stays healthy for five minutes, so unrelated crashes in a long session do not stop OCR. Repeated failure enters a visible stopped state and requires a user retry, preventing a crash loop while preserving capture configuration.
 - Text Tracking Engine: compares OCR outputs across frames, deduplicates stable text, batches changed segments, and decides what needs retranslating.
 - Translation Router: exposes Codex translation through a narrow interface with structured multi-box batching, retries, caching, and timeouts, while leaving a provider slot for post-v1 CAT-Translate, DeepL, Google Translate, and BYOK support.
 - Codex Provider Adapter: wraps the pinned `pi-ai` OpenAI Codex provider, drives OAuth through main-process UI callbacks, discovers account models and reasoning options, submits translation-only streams with no tools, handles cancellation and session reuse, and maps library-specific failures into stable Rosecr errors.
@@ -226,7 +226,7 @@ The first release prioritizes the English-Japanese language pair in both directi
 - Ten minutes of unchanged Auto capture produces zero provider calls after the initial result and averages no more than 5% CPU on the documented reference machine. The benchmark report records hardware, resolution, profile, model, and scan cadence.
 - Default logs and support exports contain no screenshots, OCR text, translations, prompts, raw provider responses, or credentials. Network inspection confirms that only eligible extracted text and bounded text context reach Codex after an explicit Play or Auto action.
 - Capture configuration survives app restart, provider failure, OCR-sidecar crash, and temporary game-window loss. Auto always returns disabled after a fresh Rosecr process start.
-- All contract, fixture, integration, security, packaging, and recovery tests described in this PRD pass against the pinned Electron, Python, `owocr`, and `pi-ai` versions used for the release.
+- All contract, fixture, integration, security, packaging, and recovery tests described in this PRD pass against the pinned Electron, Python, RapidOCR, OCR model, and `pi-ai` versions used for the release.
 
 ## Out of Scope
 

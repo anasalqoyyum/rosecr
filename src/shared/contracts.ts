@@ -13,6 +13,33 @@ export type ControlCommand =
   | { type: 'open-settings' }
   | { type: 'set-shortcut'; action: ShortcutAction; accelerator: string | null };
 
+export type OcrOrientation = 'horizontal' | 'vertical';
+
+/** Physical pixels relative to the top-left of the image that was recognized. */
+export interface PhysicalRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface OcrBox {
+  rect: PhysicalRect;
+  text: string;
+  /** Engine recognition score from 0 to 1. */
+  confidence: number;
+  orientation: OcrOrientation;
+  /** Zero-based position in visual reading order within one result. */
+  readingOrder: number;
+}
+
+export interface OcrResult {
+  captureGeneration: number;
+  boxes: OcrBox[];
+  /** Sidecar time spent inside the OCR engine, excluding transport and decoding. */
+  ocrMs: number;
+}
+
 export const DIRECTIONS = ['ja-en', 'en-ja'] as const satisfies readonly Direction[];
 export const CAPTURE_SCOPES = ['region', 'window'] as const satisfies readonly CaptureScope[];
 export const CONTROL_STATUSES = ['idle', 'running', 'waiting', 'error'] as const satisfies readonly ControlStatus[];
