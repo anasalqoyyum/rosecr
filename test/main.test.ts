@@ -353,3 +353,19 @@ test('a restart with two matching windows asks for the window and keeps the regi
   await main.invoke(IPC.command, { type: 'play' });
   assert.match(main.starts.at(-1) ?? '', /"sourceId":"window:43:0"/);
 });
+
+test('choosing another game while the region request is pending discards that request', async (t) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const main = loadMain(true, gate);
+  t.after(() => main.dispose());
+  await main.startup;
+  await main.invoke(IPC.selectTarget, 'window:42:0');
+  const selecting = main.invoke(IPC.selectRegion);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await main.invoke(IPC.selectTarget, 'window:43:0');
+  release();
+  await assert.rejects(selecting, /game window changed/);
+  assert.equal(main.windows.length, 4, 'no selector opens over the previous game');
+  assert.equal((await main.invoke(IPC.getState)).region, null);
+});

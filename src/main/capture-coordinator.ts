@@ -94,12 +94,14 @@ export class CaptureCoordinator {
     this.mode = mode;
     const generation = this.generation;
     const attached = attachedWindow(this.getState());
-    // An attached window starts synchronously so Clear or a replacement target cannot slip in first.
+    // Taken before any lookup so a Clear pressed while the saved game is located still suppresses this output.
+    const outputClearGeneration = this.getState().clearGeneration;
+    // An attached window starts synchronously so a replacement target cannot slip in first.
     const target = attached ?? await this.findSavedGame(generation);
     if (!target || generation !== this.generation) return;
     this.updateState(captureStarting);
     this.active = true;
-    this.outputClearGeneration = this.getState().clearGeneration;
+    this.outputClearGeneration = outputClearGeneration;
     this.overlayReady = false;
     this.lastMetadata = null;
     this.lastDipBounds = null;

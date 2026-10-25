@@ -146,12 +146,15 @@ async function selectRegion(): Promise<ControlState> {
     target = await attachSavedTarget();
     metadata = await metadataClient.query(target.nativeHandle);
   }
+  // The region is drawn over one specific window; choosing another game meanwhile invalidates it.
+  const stillTargeted = (): boolean => attachedWindow(state)?.id === target.id;
+  if (!stillTargeted()) throw new Error('The game window changed. Select the region again.');
   if (!metadata.capturable || !metadata.clientRect || !regionSelector) {
     throw new Error('Restore the game window, then select the region.');
   }
   const bounds = physicalClientRectToDip(metadata.clientRect, (point) => screen.screenToDipPoint(point));
   const selection = await regionSelector.open({ clientBounds: bounds, savedRegion: state.region, covering: settingsWindow });
-  if (selection.kind === 'cancelled') return state;
+  if (selection.kind === 'cancelled' || !stillTargeted()) return state;
   updateState((current) => regionSaved(current, selection.region));
   overlayWindow?.hide();
   if (state.autoEnabled) await captureCoordinator?.start('continuous');
@@ -218,6 +221,7 @@ async function selectCaptureTarget(sourceId: unknown): Promise<ControlState> {
   const targets = await listCaptureTargets();
   const target = targets.find((candidate) => candidate.id === sourceId);
   if (!target) throw new Error('The selected window is no longer available or belongs to Rosecr.');
+  regionSelector?.cancel();
   captureCoordinator?.stop();
   updateState((current) => selectTarget(current, target));
   if (state.autoEnabled) await captureCoordinator?.start('continuous');

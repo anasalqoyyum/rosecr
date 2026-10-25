@@ -649,3 +649,16 @@ test('a failed window listing while reconnecting keeps Auto waiting for the game
   await settle();
   assert.deepEqual(f.starts, ['window:99:0']);
 });
+
+test('Clear while a restored game is being located suppresses the pending one-shot output', async (t) => {
+  const f = fixture(createInitialState({ ...cloneDefaults(), target: savedTargetFrom(gameWindow('42')) }));
+  t.after(() => f.coordinator.stop());
+  const listing = deferred<CaptureTarget[]>();
+  f.setWindows(() => listing.promise);
+  const startup = f.coordinator.start('one-shot');
+  f.clear();
+  listing.resolve([gameWindow('42')]);
+  await startup;
+  f.frame();
+  assert.equal(f.visible, false);
+});
