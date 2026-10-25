@@ -43,3 +43,5 @@ Connect captured game-region frames to bundled `owocr` through a supervised Pyth
 ## Notes
 
 This is a debug-facing tracer bullet, but it must use the production process boundary and generation model.
+
+Frames come from the native helper's `FrameSource`, not Electron `getUserMedia` frames. The helper's minimal frame path (enumerate, query, start, grab, closed, device lost) lands before or as the first part of this slice. See `docs/native-helper-decision.md`.

@@ -42,4 +42,4 @@ Extend the working Auto pipeline from a saved region to the whole selected game 
 
 ## Notes
 
-If TODO-002 selected a native helper, this slice completes its production integration rather than creating a second backend.
+TODO-002 selected a native helper that owns the WGC session and delivers frames (`docs/native-helper-decision.md`). This slice adds HDR handling, display-topology invalidation, and reattachment to that helper rather than creating a second backend.
