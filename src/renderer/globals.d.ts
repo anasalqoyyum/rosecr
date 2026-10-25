@@ -15,7 +15,6 @@ declare global {
       onStateChanged(listener: (state: ControlState) => void): () => void;
     };
     captureProbe: {
-      onStart(listener: (options: CaptureStartOptions) => void): void;
       onStop(listener: () => void): void;
       report(report: CaptureWorkerReport): void;
     };

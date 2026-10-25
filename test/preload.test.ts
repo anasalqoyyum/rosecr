@@ -66,14 +66,9 @@ test('bundled capture preload initializes with sandbox require and delivers work
   const f = loadPreload('capture');
   const api = f.exposed.captureProbe;
   assert.ok(api);
-  const options = { sourceId: 'window:42:0', captureGeneration: 7 };
-  let started = false;
   let stopped = false;
-  api.onStart((next) => { assert.equal(next, options); started = true; });
   api.onStop(() => { stopped = true; });
-  f.listeners.emit(IPC.captureWorkerStart, {}, options);
   f.listeners.emit(IPC.captureWorkerStop, {});
-  assert.equal(started, true);
   assert.equal(stopped, true);
   const report = { kind: 'muted', captureGeneration: 7, timestamp: 1000 } as const;
   api.report(report);

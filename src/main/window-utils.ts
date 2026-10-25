@@ -1,11 +1,5 @@
 import type { BrowserWindow, WebPreferences } from 'electron';
 
-export function nativeHandleDecimal(window: BrowserWindow): string {
-  const buffer = window.getNativeWindowHandle();
-  if (buffer.length >= 8) return buffer.readBigUInt64LE(0).toString(10);
-  return BigInt(buffer.readUInt32LE(0)).toString(10);
-}
-
 export function secureWebPreferences(
   preload?: string,
   overrides: Partial<WebPreferences> = {}

@@ -348,7 +348,10 @@ if (hasSingleInstanceLock) {
     captureCoordinator?.stop();
   });
 
-  app.on('will-quit', () => globalShortcut.unregisterAll());
+  app.on('will-quit', () => {
+    globalShortcut.unregisterAll();
+    metadataClient?.stop();
+  });
 
   app.on('window-all-closed', () => app.quit());
 }

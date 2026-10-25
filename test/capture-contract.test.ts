@@ -1,27 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CaptureHealth } from '../src/main/capture-health';
-import { nativeWindowsToCaptureTargets, parseWindowSourceId, publicCaptureTargets } from '../src/main/capture-source';
-import { markerBounds, physicalClientRectToDip } from '../src/main/geometry';
-
-const image = { isEmpty: () => true, toDataURL: () => '' };
-
-test('source ids expose HWNDs and Rosecr-owned windows never become targets', () => {
-  assert.deepEqual(parseWindowSourceId('window:123456:0'), {
-    nativeHandle: '123456',
-    ownedByCurrentProcess: false
-  });
-  const targets = publicCaptureTargets(
-    [
-      { id: 'window:10:1', name: 'Rosecr', thumbnail: image, appIcon: null },
-      { id: 'window:11:0', name: 'Rosecr overlay', thumbnail: image, appIcon: null },
-      { id: 'window:12:0', name: 'Game', thumbnail: image, appIcon: null }
-    ],
-    new Set(['11']),
-    new Set(['Rosecr settings'])
-  );
-  assert.deepEqual(targets.map((target) => target.name), ['Game']);
-});
+import { nativeWindowsToCaptureTargets } from '../src/main/capture-source';
+import { physicalClientRectToDip } from '../src/main/geometry';
 
 test('native target enumeration rejects every window owned by Rosecr', () => {
   const targets = nativeWindowsToCaptureTargets(
@@ -49,7 +30,6 @@ test('physical target geometry converts both corners for mixed-DPI alignment', (
     ({ x, y }) => ({ x: Math.round(x / 1.5), y: Math.round(y / 1.5) })
   );
   assert.deepEqual(bounds, { x: 1333, y: 67, width: 800, height: 600 });
-  assert.deepEqual(markerBounds(bounds), { x: 64, y: 60, width: 48, height: 48 });
 });
 
 test('blank and invalid frames enter waiting instead of appearing valid', () => {

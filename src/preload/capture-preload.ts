@@ -11,9 +11,6 @@ export interface CaptureStartOptions {
 contextBridge.exposeInMainWorld(
   'captureProbe',
   Object.freeze({
-    onStart: (listener: (options: CaptureStartOptions) => void): void => {
-      ipcRenderer.on(IPC.captureWorkerStart, (_event, options: CaptureStartOptions) => listener(options));
-    },
     onStop: (listener: () => void): void => {
       ipcRenderer.on(IPC.captureWorkerStop, () => listener());
     },

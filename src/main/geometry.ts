@@ -21,7 +21,3 @@ export function physicalClientRectToDip(
   };
 }
 
-export function markerBounds(bounds: Pick<Rectangle, 'width' | 'height'>): Rectangle {
-  const size = Math.max(20, Math.min(72, Math.round(Math.min(bounds.width, bounds.height) * 0.08)));
-  return { x: Math.round(bounds.width * 0.08), y: Math.round(bounds.height * 0.1), width: size, height: size };
-}

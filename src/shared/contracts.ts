@@ -26,7 +26,6 @@ export const IPC = Object.freeze({
   selectTarget: 'rosecr:select-target',
   startCaptureProbe: 'rosecr:start-capture-probe',
   stopCaptureProbe: 'rosecr:stop-capture-probe',
-  captureWorkerStart: 'rosecr:capture-worker-start',
   captureWorkerStop: 'rosecr:capture-worker-stop',
   captureWorkerReport: 'rosecr:capture-worker-report'
 });
