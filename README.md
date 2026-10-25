@@ -27,6 +27,17 @@ Exclusive fullscreen, whole-desktop capture, manual inspect, dictionary cards, o
 
 The PRD is authoritative when planning documents disagree.
 
+## Development
+
+Rosecr uses TypeScript and pnpm 10.
+
+```powershell
+pnpm install
+pnpm run typecheck
+pnpm test
+pnpm start
+```
+
 ## Status
 
-Planning and documentation only. Implementation has not started.
+Milestone 0 is mostly complete. The Electron utility shell and executable Windows capture spike pass windowed and borderless game capture, target rejection, click-through input, movement, resizing, mixed-DPI and monitor changes, minimization, and target loss. The spike records that production requires a thin native Windows helper for explicit WGC lifecycle, metadata, and device-loss recovery. Captured-output exclusion, a live protected-target run, and device-loss evidence are still open.

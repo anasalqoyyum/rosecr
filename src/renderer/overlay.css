@@ -1,0 +1,25 @@
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+}
+
+.marker {
+  position: absolute;
+  top: 10%;
+  left: 8%;
+  width: clamp(24px, 8vmin, 72px);
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border: 3px solid #00d4aa;
+  border-radius: 8px;
+  background: rgb(0 212 170 / 12%);
+}

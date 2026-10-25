@@ -18,10 +18,10 @@ Create the smallest runnable Electron shell that exposes the real v1 control mod
 
 ## Acceptance criteria
 
-- [ ] The utility bar launches with Auto off and visibly distinguishes idle, running, waiting, and error status.
-- [ ] Play, Auto, Overlay, Clear, direction, scope, and settings controls send typed commands through a narrow main-process IPC boundary.
-- [ ] Durable settings reload after restart while active Auto never does.
-- [ ] Configurable global shortcuts can be disabled and registration conflicts are visible.
+- [x] The utility bar launches with Auto off and visibly distinguishes idle, running, waiting, and error status.
+- [x] Play, Auto, Overlay, Clear, direction, scope, and settings controls send typed commands through a narrow main-process IPC boundary.
+- [x] Durable settings reload after restart while active Auto never does.
+- [x] Configurable global shortcuts can be disabled and registration conflicts are visible.
 
 ## Blocked by
 

@@ -18,11 +18,14 @@ Implement a narrow executable spike that captures one explicitly selected window
 
 ## Acceptance criteria
 
-- [ ] A windowed and borderless-fullscreen test target can produce frames without becoming the foreground window.
+- [x] A windowed and borderless-fullscreen test target can produce frames without becoming the foreground window.
 - [ ] Rosecr-owned controller and overlay windows are rejected as targets and excluded from captured frames.
-- [ ] The marker remains aligned after move, resize, monitor, and mixed-DPI changes and never takes focus or mouse input.
+  - Target rejection is proven. Frame exclusion currently rests on content protection being enabled; captured output has not been inspected with Rosecr windows over the target.
+- [x] The marker remains aligned after move, resize, monitor, and mixed-DPI changes and never takes focus or mouse input.
 - [ ] Minimized, closed, blank, or uncapturable targets enter a visible waiting state instead of emitting valid-looking frames.
+  - Minimized and closed targets passed live. Blank and uncapturable targets are covered by automated tests only; a live protected-target run is still required.
 - [ ] The repository records the chosen backend and evidence against latency, resize, device-loss, exclusion, and alignment requirements.
+  - The backend decision and latency, resize, and alignment evidence are recorded. Device-loss evidence is pending the native helper, and exclusion evidence is partial (see above).
 
 ## Blocked by
 
