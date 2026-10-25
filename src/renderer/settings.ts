@@ -53,6 +53,7 @@ type SettingsShortcutAction = import('../shared/contracts').ShortcutAction;
       const conflict = document.createElement('output');
       conflict.className = 'field-error';
       conflict.dataset.conflict = action;
+      conflict.textContent = state.shortcutConflicts[action] ?? '';
       row.append(labelElement, input, conflict);
       shortcutFields.append(row);
     }
