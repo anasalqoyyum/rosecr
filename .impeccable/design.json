@@ -1,0 +1,191 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-25T13:39:27Z",
+  "title": "Design System: Rosecr",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Cool gray canvas",
+        "tonalRamp": ["oklch(15% 0.0013 286.4)", "oklch(25% 0.0013 286.4)", "oklch(35% 0.0013 286.4)", "oklch(45% 0.0013 286.4)", "oklch(55% 0.0013 286.4)", "oklch(65% 0.0013 286.4)", "oklch(75% 0.0013 286.4)", "oklch(95% 0.0013 286.4)"]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "White surface",
+        "tonalRamp": ["oklch(15% 0.0000 0.0)", "oklch(25% 0.0000 0.0)", "oklch(35% 0.0000 0.0)", "oklch(45% 0.0000 0.0)", "oklch(55% 0.0000 0.0)", "oklch(65% 0.0000 0.0)", "oklch(75% 0.0000 0.0)", "oklch(95% 0.0000 0.0)"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Graphite ink",
+        "tonalRamp": ["oklch(15% 0.0114 278.0)", "oklch(25% 0.0114 278.0)", "oklch(35% 0.0114 278.0)", "oklch(45% 0.0114 278.0)", "oklch(55% 0.0114 278.0)", "oklch(65% 0.0114 278.0)", "oklch(75% 0.0114 278.0)", "oklch(95% 0.0114 278.0)"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted ink",
+        "tonalRamp": ["oklch(15% 0.0158 281.3)", "oklch(25% 0.0158 281.3)", "oklch(35% 0.0158 281.3)", "oklch(45% 0.0158 281.3)", "oklch(55% 0.0158 281.3)", "oklch(65% 0.0158 281.3)", "oklch(75% 0.0158 281.3)", "oklch(95% 0.0158 281.3)"]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Soft divider",
+        "tonalRamp": ["oklch(15% 0.0081 286.2)", "oklch(25% 0.0081 286.2)", "oklch(35% 0.0081 286.2)", "oklch(45% 0.0081 286.2)", "oklch(55% 0.0081 286.2)", "oklch(65% 0.0081 286.2)", "oklch(75% 0.0081 286.2)", "oklch(95% 0.0081 286.2)"]
+      },
+      "rose": {
+        "role": "primary",
+        "displayName": "Muted rose",
+        "tonalRamp": ["oklch(15% 0.1513 5.1)", "oklch(25% 0.1513 5.1)", "oklch(35% 0.1513 5.1)", "oklch(45% 0.1513 5.1)", "oklch(55% 0.1513 5.1)", "oklch(65% 0.1513 5.1)", "oklch(75% 0.1513 5.1)", "oklch(95% 0.1513 5.1)"]
+      },
+      "rose-soft": {
+        "role": "primary",
+        "displayName": "Pale rose",
+        "tonalRamp": ["oklch(15% 0.0155 352.0)", "oklch(25% 0.0155 352.0)", "oklch(35% 0.0155 352.0)", "oklch(45% 0.0155 352.0)", "oklch(55% 0.0155 352.0)", "oklch(65% 0.0155 352.0)", "oklch(75% 0.0155 352.0)", "oklch(95% 0.0155 352.0)"]
+      },
+      "overlay": {
+        "role": "neutral",
+        "displayName": "Near-black plate",
+        "tonalRamp": ["oklch(15% 0.0080 274.5)", "oklch(25% 0.0080 274.5)", "oklch(35% 0.0080 274.5)", "oklch(45% 0.0080 274.5)", "oklch(55% 0.0080 274.5)", "oklch(65% 0.0080 274.5)", "oklch(75% 0.0080 274.5)", "oklch(95% 0.0080 274.5)"]
+      },
+      "on-overlay": {
+        "role": "neutral",
+        "displayName": "Overlay text",
+        "tonalRamp": ["oklch(15% 0.0026 286.4)", "oklch(25% 0.0026 286.4)", "oklch(35% 0.0026 286.4)", "oklch(45% 0.0026 286.4)", "oklch(55% 0.0026 286.4)", "oklch(65% 0.0026 286.4)", "oklch(75% 0.0026 286.4)", "oklch(95% 0.0026 286.4)"]
+      },
+      "success": {
+        "role": "status",
+        "displayName": "Deep green status",
+        "tonalRamp": ["oklch(15% 0.0792 161.0)", "oklch(25% 0.0792 161.0)", "oklch(35% 0.0792 161.0)", "oklch(45% 0.0792 161.0)", "oklch(55% 0.0792 161.0)", "oklch(65% 0.0792 161.0)", "oklch(75% 0.0792 161.0)", "oklch(95% 0.0792 161.0)"]
+      },
+      "success-soft": {
+        "role": "status",
+        "displayName": "Soft green status",
+        "tonalRamp": ["oklch(15% 0.0124 157.0)", "oklch(25% 0.0124 157.0)", "oklch(35% 0.0124 157.0)", "oklch(45% 0.0124 157.0)", "oklch(55% 0.0124 157.0)", "oklch(65% 0.0124 157.0)", "oklch(75% 0.0124 157.0)", "oklch(95% 0.0124 157.0)"]
+      },
+      "warning": {
+        "role": "status",
+        "displayName": "Amber warning",
+        "tonalRamp": ["oklch(15% 0.1024 72.2)", "oklch(25% 0.1024 72.2)", "oklch(35% 0.1024 72.2)", "oklch(45% 0.1024 72.2)", "oklch(55% 0.1024 72.2)", "oklch(65% 0.1024 72.2)", "oklch(75% 0.1024 72.2)", "oklch(95% 0.1024 72.2)"]
+      },
+      "warning-soft": {
+        "role": "status",
+        "displayName": "Soft amber status",
+        "tonalRamp": ["oklch(15% 0.0360 87.8)", "oklch(25% 0.0360 87.8)", "oklch(35% 0.0360 87.8)", "oklch(45% 0.0360 87.8)", "oklch(55% 0.0360 87.8)", "oklch(65% 0.0360 87.8)", "oklch(75% 0.0360 87.8)", "oklch(95% 0.0360 87.8)"]
+      },
+      "error": {
+        "role": "status",
+        "displayName": "Deep red error",
+        "tonalRamp": ["oklch(15% 0.1684 20.1)", "oklch(25% 0.1684 20.1)", "oklch(35% 0.1684 20.1)", "oklch(45% 0.1684 20.1)", "oklch(55% 0.1684 20.1)", "oklch(65% 0.1684 20.1)", "oklch(75% 0.1684 20.1)", "oklch(95% 0.1684 20.1)"]
+      }
+    },
+    "typographyMeta": {
+      "display": {"displayName": "Display", "purpose": "Application titles."},
+      "section": {"displayName": "Section", "purpose": "Settings and surface headings."},
+      "title": {"displayName": "Title", "purpose": "Subsection headings."},
+      "body": {"displayName": "Body", "purpose": "Explanations and supporting copy."},
+      "control": {"displayName": "Control", "purpose": "Toolbar actions, navigation, and form values."},
+      "field-label": {"displayName": "Field label", "purpose": "Form labels."},
+      "caption": {"displayName": "Caption", "purpose": "Supporting labels and metadata."},
+      "overlay": {"displayName": "Overlay", "purpose": "Translation text over the game."},
+      "japanese": {"displayName": "Japanese", "purpose": "Japanese glyph coverage and fallback stack."}
+    },
+    "shadows": [],
+    "motion": [
+      {"name": "brief-state-transition", "value": "100ms ease-out", "purpose": "Brief opacity and control background transitions when reduced motion is not requested."}
+    ],
+    "breakpoints": [
+      {"name": "compact-window", "value": "760px"},
+      {"name": "wide-shell", "value": "1100px"}
+    ],
+    "layoutTokens": {
+      "breakpoint-settings": "960px",
+      "container-settings": "960px",
+      "container-toolbar": "1100px"
+    },
+    "surfaceOpacity": {
+      "opacity-plate": "0.88"
+    }
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action for starting a one-shot translation.",
+      "html": "<button class=\"ds-button-primary\">Translate once</button>",
+      "css": ".ds-button-primary{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:7px 14px;border:1px solid transparent;border-radius:var(--radius-control);background:var(--color-rose);color:var(--color-surface);font:14px/1.5 var(--font-ui);white-space:nowrap}.ds-button-primary:hover:not(:disabled){background:#8B2948}.ds-button-primary:focus-visible{outline:2px solid var(--color-rose);outline-offset:3px}.ds-button-primary:active:not(:disabled){transform:translateY(1px)}.ds-button-primary:disabled{background:#EFEFF2;color:var(--color-muted);border-color:#E4E4E8}@media(prefers-reduced-motion:no-preference){.ds-button-primary{transition:background-color 100ms ease-out}}"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "A supporting action in the controller or settings.",
+      "html": "<button class=\"ds-button-secondary\">Cancel</button>",
+      "css": ".ds-button-secondary{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:36px;padding:7px 14px;border:1px solid var(--color-line);border-radius:var(--radius-control);background:var(--color-surface);color:var(--color-ink);font:14px/1.5 var(--font-ui);white-space:nowrap}.ds-button-secondary:hover:not(:disabled){background:var(--color-rose-soft)}.ds-button-secondary:focus-visible{outline:2px solid var(--color-rose);outline-offset:3px}.ds-button-secondary:active:not(:disabled){transform:translateY(1px)}.ds-button-secondary:disabled{background:#EFEFF2;color:var(--color-muted);border-color:#E4E4E8}@media(prefers-reduced-motion:no-preference){.ds-button-secondary{transition:background-color 100ms ease-out}}"
+    },
+    {
+      "name": "Toggle switch",
+      "kind": "button",
+      "description": "A labeled binary setting such as Auto or overlay visibility.",
+      "html": "<button class=\"ds-switch\" aria-pressed=\"false\">Auto<span class=\"ds-switch-track\" aria-hidden=\"true\"></span></button>",
+      "css": ".ds-switch{display:inline-flex;align-items:center;gap:8px;padding:7px 4px;border:0;border-radius:var(--radius-control);background:transparent;color:var(--color-ink);font:14px/1.5 var(--font-ui);white-space:nowrap}.ds-switch:hover:not(:disabled){background:var(--color-rose-soft)}.ds-switch:focus-visible{outline:2px solid var(--color-rose);outline-offset:3px}.ds-switch-track{display:flex;align-items:center;width:34px;height:20px;padding:3px;border-radius:20px;background:#8C8D97}.ds-switch-track:after{content:'';width:14px;height:14px;border-radius:50%;background:#FFF}.ds-switch[aria-pressed=true] .ds-switch-track{justify-content:flex-end;background:var(--color-rose)}.ds-switch:disabled .ds-switch-track{opacity:.4}"
+    },
+    {
+      "name": "Select field",
+      "kind": "input",
+      "refersTo": "field-control",
+      "description": "A compact form control for direction, model, and capture choices.",
+      "html": "<label class=\"ds-field\">Direction<select class=\"ds-field-control\"><option>Japanese to English</option></select></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:4px;color:var(--color-ink);font:500 14px/20px var(--font-ui)}.ds-field-control{width:260px;max-width:100%;min-height:36px;padding:6px 10px;border:1px solid var(--color-line);border-radius:var(--radius-control);background:var(--color-surface);color:var(--color-ink);font:14px/1.5 var(--font-ui)}.ds-field-control:focus-visible{outline:2px solid var(--color-rose);outline-offset:3px}@media(max-width:760px){.ds-field-control{width:100%}}"
+    },
+    {
+      "name": "Status pill",
+      "kind": "chip",
+      "refersTo": "status-pill",
+      "description": "A short state label; color reinforces its text.",
+      "html": "<span class=\"ds-status ds-status-wait\" role=\"status\">Waiting</span>",
+      "css": ".ds-status{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:4px;background:var(--color-rose-soft);color:var(--color-rose);font:600 12px/18px var(--font-ui)}.ds-status-success{background:var(--color-success-soft);color:var(--color-success)}.ds-status-wait{background:var(--color-warning-soft);color:var(--color-warning)}.ds-status-error{background:#FFF0F1;color:var(--color-error)}"
+    },
+    {
+      "name": "Settings navigation item",
+      "kind": "nav",
+      "description": "The active page stays visible in the shallow settings navigation.",
+      "html": "<button class=\"ds-settings-nav-item\" aria-current=\"page\">Translation</button>",
+      "css": ".ds-settings-nav-item{display:block;width:100%;padding:9px 12px;border:0;border-radius:var(--radius-control);background:transparent;color:var(--color-ink);text-align:left;font:14px/1.5 var(--font-ui)}.ds-settings-nav-item:hover{background:var(--color-rose-soft)}.ds-settings-nav-item[aria-current=page]{background:var(--color-rose-soft);color:var(--color-rose);font-weight:600}.ds-settings-nav-item:focus-visible{outline:2px solid var(--color-rose);outline-offset:3px}"
+    },
+    {
+      "name": "Passive translation plate",
+      "kind": "custom",
+      "refersTo": "translation-plate",
+      "description": "A click-through dark plate for a complete translated result.",
+      "html": "<div class=\"ds-translation-plate\">We should reach the station before sunset.</div>",
+      "css": ".ds-translation-plate{padding:14px 18px;border-radius:var(--radius-plate);background:var(--color-overlay);color:var(--color-on-overlay);font:24px/36px var(--font-ui);pointer-events:none}.ds-translation-plate.is-updating{color:#B9BAC3}@media(prefers-reduced-motion:no-preference){.ds-translation-plate{transition:opacity 100ms ease-out}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The game stays in focus.",
+    "overview": "Rosecr's proposed interface keeps the controller compact and settings shallow, leaving the game as the main view. Light utility surfaces use a muted rose action color. Translation uses a separate dark plate with bright text so it can sit over varied game imagery. Noto Sans and Noto Sans JP cover the two planned languages.\n\nThis direction is captured in [the local design foundation](docs/design-foundation.html) and the [Paper boards](https://app.paper.design/file/01M5SK8JB1SSBWD365703FBZP9). It is a proposed v1 system, not a description of every shipped screen. M0 has an Electron shell and capture marker; it does not include OCR or translation.",
+    "keyCharacteristics": [
+      "Compact controls around a game-first experience.",
+      "Distinct Japanese and Latin font stacks.",
+      "High-contrast translation plates separated from light settings surfaces.",
+      "Written state labels for idle, waiting, updating, and error."
+    ],
+    "rules": [
+      {"name": "The State Label Rule", "body": "Pair status color with a word such as \"Starting\", \"Capturing\", \"Waiting\", or \"Updating\". Color alone does not explain what Rosecr is doing.", "section": "colors"},
+      {"name": "The Complete Result Rule", "body": "Never show a partial translation. Commit the finished text as one update.", "section": "components"}
+    ],
+    "dos": [
+      "Do keep controls compact and leave the game as the main view.",
+      "Do pair status colors with explicit text labels.",
+      "Do keep the source visible until the first complete translation is ready.",
+      "Do keep the last valid translation readable while an update is pending.",
+      "Do preserve all translated text and use a callout only after readable in-place layouts fail.",
+      "Do reflow settings for resized desktop windows."
+    ],
+    "donts": [
+      "Don't treat the design mockup or its synthetic examples as shipped OCR or translation behavior.",
+      "Don't show streamed or partial translation text.",
+      "Don't make passive translation plates interactive.",
+      "Don't add a provider marketplace to the v1 settings. Codex is the only planned provider.",
+      "Don't turn settings into a dashboard or a nested-card layout."
+    ]
+  }
+}
