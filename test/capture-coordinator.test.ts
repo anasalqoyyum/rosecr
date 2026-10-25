@@ -371,3 +371,52 @@ test('stale-size frames neither increment nor reset blank health after a resize'
   f.frame({ width: 900, blank: true, frameCount: 9 });
   assert.equal(f.state.statusMessage, 'Waiting: target emitted repeated blank frames');
 });
+
+test('a retained one-shot or Auto-off overlay hides once the target moves, resizes, or disappears', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: 1000 });
+  for (const change of [metadata(50), metadata(0, 900), metadata(0, 800, 120), { ...metadata(), capturable: false, minimized: true }, { ...metadata(), capturable: false, exists: false }]) {
+    for (const retainedBy of ['one-shot', 'auto-off'] as const) {
+      const f = fixture();
+      t.after(() => f.coordinator.stop());
+      if (retainedBy === 'auto-off') f.auto();
+      await f.coordinator.start(retainedBy === 'one-shot' ? 'one-shot' : 'continuous');
+      f.frame();
+      if (retainedBy === 'auto-off') {
+        f.auto(false);
+        f.coordinator.stop(false);
+      }
+      t.mock.timers.tick(200);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.equal(f.visible, true);
+      f.setQuery(async () => change);
+      t.mock.timers.tick(200);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.equal(f.visible, false);
+      f.coordinator.setOverlayVisibility(true);
+      assert.equal(f.visible, false);
+      const count = f.queries.length;
+      t.mock.timers.tick(600);
+      assert.equal(f.queries.length, count);
+    }
+  }
+});
+
+test('a capture with no usable frame enters waiting instead of running indefinitely', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: 1000 });
+  for (const mode of ['one-shot', 'continuous'] as const) {
+    const f = fixture();
+    t.after(() => f.coordinator.stop());
+    await f.coordinator.start(mode);
+    f.frame({ width: 1600 });
+    t.mock.timers.tick(4999);
+    assert.equal(f.state.status, 'idle');
+    t.mock.timers.tick(1);
+    assert.equal(f.state.statusMessage, 'Waiting: no usable frames from target');
+    assert.equal(f.state.captureProbe.active, false);
+
+    await f.coordinator.start(mode);
+    f.frame();
+    t.mock.timers.tick(10000);
+    assert.notEqual(f.state.status, 'waiting');
+  }
+});

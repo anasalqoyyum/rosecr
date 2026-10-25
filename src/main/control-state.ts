@@ -89,7 +89,7 @@ export function captureFrameReported(state: ControlState, report: CaptureFrameRe
     captureProbe: {
       active: !oneShotFinished,
       frameCount: report.frameCount,
-      firstFrameLatencyMs: state.captureProbe.firstFrameLatencyMs ?? report.firstFrameLatencyMs ?? null,
+      firstFrameLatencyMs: report.firstFrameLatencyMs ?? state.captureProbe.firstFrameLatencyMs,
       frameSize: { width: report.width, height: report.height },
       lastFrameAt: report.timestamp
     }

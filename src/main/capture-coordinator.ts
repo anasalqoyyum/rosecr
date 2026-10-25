@@ -10,6 +10,8 @@ import {
 import { physicalClientRectToDip } from './geometry';
 import { Win32MetadataClient, type WindowMetadata } from './win32-metadata-client';
 
+const USABLE_FRAME_DEADLINE_MS = 5000;
+
 export type CaptureWorkerReport = { captureGeneration?: number } & (
   | ({ kind: 'frame'; blank: boolean } & CaptureFrameReport)
   | { kind: 'ended' | 'muted'; timestamp: number }
@@ -37,6 +39,7 @@ export class CaptureCoordinator {
   private readonly onGeometryChanged: () => void;
   private readonly health = new CaptureHealth();
   private metadataTimer: NodeJS.Timeout | null = null;
+  private usableFrameDeadline: NodeJS.Timeout | null = null;
   private generation = 0;
   private metadataQueryGeneration: number | null = null;
   private active = false;
@@ -64,7 +67,7 @@ export class CaptureCoordinator {
       this.updateState((state) => targetUnavailable(state, 'choose a game window'));
       return;
     }
-    this.stop(false);
+    this.stop();
     const generation = this.generation;
     this.active = true;
     this.outputClearGeneration = this.getState().clearGeneration;
@@ -83,6 +86,7 @@ export class CaptureCoordinator {
         `window.captureProbeRuntime.start(${JSON.stringify({ frameRate: 60, sourceId: target.id, captureGeneration: generation })})`
       ) as CaptureWorkerReport | undefined;
       if (generation !== this.generation) return;
+      this.usableFrameDeadline = setTimeout(() => this.waitForTarget('no usable frames from target'), USABLE_FRAME_DEADLINE_MS);
       if (report) this.handleWorkerReport(report);
     } catch (error) {
       if (generation !== this.generation) return;
@@ -98,11 +102,15 @@ export class CaptureCoordinator {
     this.active = false;
     if (this.metadataTimer) clearInterval(this.metadataTimer);
     this.metadataTimer = null;
+    if (this.usableFrameDeadline) clearTimeout(this.usableFrameDeadline);
+    this.usableFrameDeadline = null;
     this.captureWindow.webContents.send(this.workerStopChannel);
     void this.captureWindow.webContents.executeJavaScript('window.captureProbeRuntime?.stop()').catch(() => {});
     if (clearOverlay) {
       this.overlayReady = false;
       this.overlayWindow.hide();
+    } else if (this.overlayReady) {
+      this.watchRetainedOverlay();
     }
     this.updateState((state) => ({ ...state, captureProbe: { ...state.captureProbe, active: false } }));
   }
@@ -120,12 +128,7 @@ export class CaptureCoordinator {
         return false;
       }
       const bounds = physicalClientRectToDip(metadata.clientRect, (point) => this.screen.screenToDipPoint(point));
-      const previous = this.lastMetadata;
-      if (!previous || previous.dpi !== metadata.dpi ||
-          previous.clientRect?.left !== metadata.clientRect.left ||
-          previous.clientRect?.top !== metadata.clientRect.top ||
-          previous.clientRect?.right !== metadata.clientRect.right ||
-          previous.clientRect?.bottom !== metadata.clientRect.bottom ||
+      if (!this.lastMetadata || !sameClientGeometry(this.lastMetadata, metadata) ||
           this.lastDipBounds?.x !== bounds.x || this.lastDipBounds?.y !== bounds.y ||
           this.lastDipBounds?.width !== bounds.width || this.lastDipBounds?.height !== bounds.height) {
         this.overlayReady = false;
@@ -142,6 +145,30 @@ export class CaptureCoordinator {
       this.stop();
       this.updateState((state) => runtimeError(state, error instanceof Error ? error.message : 'window metadata unavailable'));
       return false;
+    } finally {
+      if (this.metadataQueryGeneration === generation) this.metadataQueryGeneration = null;
+    }
+  }
+
+  // A retained result (one-shot, or Auto turned off) is no longer refreshed, so hide it once the target changes.
+  private watchRetainedOverlay(): void {
+    const nativeHandle = this.getState().selectedTarget?.nativeHandle;
+    const retained = this.lastMetadata;
+    if (!nativeHandle || !retained) return;
+    const generation = this.generation;
+    this.metadataTimer = setInterval(() => void this.checkRetainedOverlay(nativeHandle, retained, generation), 200);
+  }
+
+  private async checkRetainedOverlay(nativeHandle: string, retained: WindowMetadata, generation: number): Promise<void> {
+    if (generation !== this.generation || this.metadataQueryGeneration === generation) return;
+    this.metadataQueryGeneration = generation;
+    try {
+      const metadata = await this.metadataClient.query(nativeHandle);
+      if (generation === this.generation && !sameClientGeometry(retained, metadata)) this.stop();
+    } catch (error) {
+      if (generation !== this.generation) return;
+      this.stop();
+      this.updateState((state) => runtimeError(state, error instanceof Error ? error.message : 'window metadata unavailable'));
     } finally {
       if (this.metadataQueryGeneration === generation) this.metadataQueryGeneration = null;
     }
@@ -194,6 +221,8 @@ export class CaptureCoordinator {
         return;
       }
       if (this.mode === 'one-shot' && report.blank) return;
+      if (this.usableFrameDeadline) clearTimeout(this.usableFrameDeadline);
+      this.usableFrameDeadline = null;
       this.overlayReady = this.getState().clearGeneration === this.outputClearGeneration;
       if (this.overlayReady && this.getState().overlayVisible && !this.overlayWindow.isVisible()) this.overlayWindow.showInactive();
       this.updateState((state) => captureFrameReported(state, report, this.mode));
@@ -217,4 +246,11 @@ export class CaptureCoordinator {
   getEvidence(): { metadata: WindowMetadata | null; overlayDipBounds: Rectangle | null } {
     return { metadata: this.lastMetadata, overlayDipBounds: this.lastDipBounds };
   }
+}
+
+function sameClientGeometry(previous: WindowMetadata, next: WindowMetadata): boolean {
+  const a = previous.clientRect;
+  const b = next.clientRect;
+  return next.capturable && previous.dpi === next.dpi && a !== null && b !== null &&
+    a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
 }

@@ -88,3 +88,13 @@ test('direction, scope, and Clear invalidate visible work without starting Auto'
   assert.equal(state.clearGeneration, 4);
   assert.equal(state.autoEnabled, false);
 });
+
+test('each capture records its own first-frame latency', () => {
+  let state = selectTarget(createInitialState(cloneDefaults()), target);
+  const frame = { frameCount: 1, width: 800, height: 600, timestamp: 1 };
+  state = captureFrameReported(state, { ...frame, firstFrameLatencyMs: 80 }, 'continuous');
+  state = captureFrameReported(state, { ...frame, frameCount: 2 }, 'continuous');
+  assert.equal(state.captureProbe.firstFrameLatencyMs, 80);
+  state = captureFrameReported(state, { ...frame, firstFrameLatencyMs: 300 }, 'one-shot');
+  assert.equal(state.captureProbe.firstFrameLatencyMs, 300);
+});
