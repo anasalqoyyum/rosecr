@@ -56,6 +56,7 @@ function fixture() {
     get state() { return state; }, get visible() { return visible; },
     setQuery(next: typeof query) { query = next; },
     select(handle: string) { state = selectTarget(state, { id: `window:${handle}:0`, name: 'Game', nativeHandle: handle }); },
+    auto(enabled = true) { state = reduceControlState(state, { type: 'set-auto', enabled }); },
     clear() { state = reduceControlState(state, { type: 'clear-overlays' }); dependencies.overlayWindow.hide(); },
     frame(overrides: Partial<Extract<CaptureWorkerReport, { kind: 'frame' }>> = {}) {
       coordinator.handleWorkerReport({ kind: 'frame', captureGeneration: generation, blank: false, frameCount: 1,
@@ -233,4 +234,140 @@ test('three blank one-shot samples enter waiting without showing or passing capt
   f.frame({ frameCount: 4 });
   assert.equal(f.state.status, 'waiting');
   assert.equal(f.state.captureProbe.frameCount, 0);
+});
+
+test('Auto polls an initially unavailable target and reattaches when it returns', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 1000 });
+  for (const minimized of [true, false]) {
+    const f = fixture();
+    t.after(() => f.coordinator.stop());
+    f.auto();
+    f.setQuery(async () => ({ ...metadata(), capturable: false, minimized }));
+    await f.coordinator.start('continuous');
+    assert.equal(f.state.status, 'waiting');
+    assert.equal(f.state.autoEnabled, true);
+    assert.equal(f.visible, false);
+    assert.equal(f.starts.length, 0);
+    t.mock.timers.tick(200);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(f.queries.length, 2);
+    assert.equal(f.starts.length, 0);
+    f.setQuery(async () => metadata());
+    t.mock.timers.tick(200);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(f.starts, ['window:42:0']);
+    f.frame();
+    assert.equal(f.state.status, 'running');
+    assert.equal(f.state.captureProbe.active, true);
+    assert.equal(f.visible, true);
+    f.coordinator.stop();
+  }
+});
+
+test('Auto recovers after polling or worker reports suspend a running capture', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 1000 });
+  for (const loss of ['metadata', 'muted', 'ended', 'error', 'blank'] as const) {
+    const f = fixture();
+    t.after(() => f.coordinator.stop());
+    f.auto();
+    await f.coordinator.start('continuous');
+    f.frame();
+    if (loss === 'metadata') {
+      f.setQuery(async () => ({ ...metadata(), capturable: false, minimized: true }));
+      t.mock.timers.tick(200);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+    } else if (loss === 'blank') {
+      for (const frameCount of [2, 3, 4]) f.frame({ blank: true, frameCount });
+    } else {
+      f.coordinator.handleWorkerReport({ kind: loss, message: 'temporarily unavailable', captureGeneration: 1, timestamp: Date.now() });
+    }
+    assert.equal(f.state.status, 'waiting');
+    assert.equal(f.visible, false);
+    f.frame({ frameCount: 99 });
+    assert.equal(f.state.status, 'waiting');
+    f.setQuery(async () => metadata());
+    t.mock.timers.tick(200);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(f.starts.length, 2);
+    f.frame();
+    assert.equal(f.state.status, 'running');
+    assert.equal(f.visible, true);
+    f.coordinator.stop();
+  }
+});
+
+test('retry queries do not overlap and cancelled or replaced watchers cannot restart old targets', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  for (const action of ['stop', 'disable-auto', 'replace'] as const) {
+    const f = fixture();
+    t.after(() => f.coordinator.stop());
+    f.auto();
+    f.setQuery(async () => ({ ...metadata(), capturable: false, minimized: true }));
+    await f.coordinator.start('continuous');
+    const pending = deferred<WindowMetadata>();
+    f.setQuery(() => pending.promise);
+    t.mock.timers.tick(200);
+    t.mock.timers.tick(400);
+    assert.equal(f.queries.length, 2);
+    if (action === 'disable-auto') f.auto(false);
+    f.coordinator.stop();
+    if (action === 'replace') {
+      f.select('43');
+      f.setQuery(async () => metadata(100));
+      await f.coordinator.start('continuous');
+    }
+    pending.resolve(metadata(900));
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.deepEqual(f.starts, action === 'replace' ? ['window:43:0'] : []);
+    const count = f.queries.length;
+    if (action === 'replace') f.coordinator.stop();
+    t.mock.timers.tick(400);
+    assert.equal(f.queries.length, count);
+  }
+});
+
+test('closed targets, one-shots, and Auto-off probes do not keep retry watchers', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  for (const scenario of ['closed', 'closed-while-waiting', 'one-shot', 'probe'] as const) {
+    const f = fixture();
+    t.after(() => f.coordinator.stop());
+    if (scenario.startsWith('closed')) f.auto();
+    f.setQuery(async () => ({ ...metadata(), capturable: false, exists: scenario !== 'closed' }));
+    await f.coordinator.start(scenario === 'one-shot' ? 'one-shot' : 'continuous');
+    if (scenario === 'closed-while-waiting') {
+      f.setQuery(async () => ({ ...metadata(), capturable: false, exists: false }));
+      t.mock.timers.tick(200);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      assert.equal(f.state.statusMessage, 'Waiting: target window was closed');
+    }
+    const count = f.queries.length;
+    t.mock.timers.tick(600);
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    assert.equal(f.queries.length, count);
+    assert.equal(f.starts.length, 0);
+    assert.equal(f.state.captureProbe.active, false);
+  }
+});
+
+test('stale-size frames neither increment nor reset blank health after a resize', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'Date'], now: 1000 });
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  await f.coordinator.start('continuous');
+  f.frame();
+  f.setQuery(async () => metadata(0, 900));
+  t.mock.timers.tick(200);
+  await Promise.resolve();
+  for (const frameCount of [2, 3, 4]) f.frame({ blank: true, frameCount });
+  assert.equal(f.state.status, 'running');
+  assert.equal(f.visible, false);
+  assert.equal(f.state.captureProbe.frameCount, 1);
+  f.frame({ width: 901, frameCount: 5 });
+  assert.equal(f.visible, true);
+  assert.equal(f.state.captureProbe.frameCount, 5);
+  f.frame({ width: 900, blank: true, frameCount: 6 });
+  f.frame({ width: 900, blank: true, frameCount: 7 });
+  f.frame({ width: 800, blank: false, frameCount: 8 });
+  f.frame({ width: 900, blank: true, frameCount: 9 });
+  assert.equal(f.state.statusMessage, 'Waiting: target emitted repeated blank frames');
 });

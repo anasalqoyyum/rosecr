@@ -116,8 +116,7 @@ export class CaptureCoordinator {
       if (generation !== this.generation) return false;
       if (!metadata.capturable || !metadata.clientRect) {
         const reason = metadata.minimized ? 'target is minimized' : metadata.exists ? 'target is blank or uncapturable' : 'target window was closed';
-        this.stop();
-        this.updateState((state) => targetUnavailable(state, reason));
+        this.waitForTarget(reason, metadata.exists);
         return false;
       }
       const bounds = physicalClientRectToDip(metadata.clientRect, (point) => this.screen.screenToDipPoint(point));
@@ -148,20 +147,52 @@ export class CaptureCoordinator {
     }
   }
 
+  private waitForTarget(reason: string, targetExists = true): void {
+    this.stop();
+    this.updateState((state) => targetUnavailable(state, reason));
+    const target = this.getState().selectedTarget;
+    if (!targetExists || !target || this.mode !== 'continuous' || !this.getState().autoEnabled) return;
+    const generation = this.generation;
+    this.metadataTimer = setInterval(() => void this.retryTarget(target.nativeHandle, generation), 200);
+  }
+
+  private async retryTarget(nativeHandle: string, generation: number): Promise<void> {
+    if (generation !== this.generation || this.metadataQueryGeneration === generation) return;
+    if (!this.getState().autoEnabled) {
+      this.stop();
+      return;
+    }
+    this.metadataQueryGeneration = generation;
+    try {
+      const metadata = await this.metadataClient.query(nativeHandle);
+      if (generation !== this.generation) return;
+      if (!metadata.exists) {
+        this.waitForTarget('target window was closed', false);
+      } else if (metadata.capturable && metadata.clientRect) {
+        await this.start('continuous');
+      }
+    } catch (error) {
+      if (generation !== this.generation) return;
+      this.stop();
+      this.updateState((state) => runtimeError(state, error instanceof Error ? error.message : 'window metadata unavailable'));
+    } finally {
+      if (this.metadataQueryGeneration === generation) this.metadataQueryGeneration = null;
+    }
+  }
+
   handleWorkerReport(report: CaptureWorkerReport): void {
     if (!this.active || report.captureGeneration !== this.generation) return;
     if (report.kind === 'frame') {
       const rect = this.lastMetadata?.clientRect;
       if (!rect || report.timestamp < this.geometryRefreshedAt) return;
-      const health = this.health.assess(report);
-      if (!health.valid) {
-        this.stop();
-        this.updateState((state) => targetUnavailable(state, health.reason));
-        return;
-      }
       // Electron frames and Win32 client bounds can differ by one physical pixel.
       if (Math.abs(report.width - (rect.right - rect.left)) > 1 ||
           Math.abs(report.height - (rect.bottom - rect.top)) > 1) return;
+      const health = this.health.assess(report);
+      if (!health.valid) {
+        this.waitForTarget(health.reason);
+        return;
+      }
       if (this.mode === 'one-shot' && report.blank) return;
       this.overlayReady = this.getState().clearGeneration === this.outputClearGeneration;
       if (this.overlayReady && this.getState().overlayVisible && !this.overlayWindow.isVisible()) this.overlayWindow.showInactive();
@@ -170,13 +201,11 @@ export class CaptureCoordinator {
       return;
     }
     if (report.kind === 'ended' || report.kind === 'muted') {
-      this.stop();
-      this.updateState((state) => targetUnavailable(state, 'capture stream stopped'));
+      this.waitForTarget('capture stream stopped');
       return;
     }
     if (report.kind === 'error') {
-      this.stop();
-      this.updateState((state) => targetUnavailable(state, report.message || 'capture failed'));
+      this.waitForTarget(report.message || 'capture failed');
     }
   }
 
