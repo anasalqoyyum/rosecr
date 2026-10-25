@@ -37,3 +37,20 @@ test('invalid persisted values fall back without discarding valid preferences', 
   assert.equal(restored.shortcuts.play, 'CommandOrControl+Alt+P');
   assert.equal(restored.shortcuts.clear, 'Ctrl+Alt+C');
 });
+
+test('the saved game and normalized region survive a restart and malformed copies are dropped individually', (context) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'rosecr-settings-'));
+  context.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const store = new SettingsStore(directory);
+  const settings = cloneDefaults();
+  settings.target = { executableName: 'ed9.exe', className: 'ED9WindowClass', title: 'Trails through Daybreak', lastKnownHandle: '100' };
+  settings.region = { x: 0.41, y: 0.67, width: 0.53, height: 0.21 };
+  store.save(settings);
+  assert.deepEqual(new SettingsStore(directory).load(), settings);
+
+  const file = path.join(directory, 'settings.json');
+  fs.writeFileSync(file, JSON.stringify({ ...settings, region: { x: 0.9, y: 0, width: 0.5, height: 0.5 } }));
+  assert.deepEqual(store.load(), { ...settings, region: null });
+  fs.writeFileSync(file, JSON.stringify({ ...settings, target: { title: 'Game' } }));
+  assert.deepEqual(store.load(), { ...settings, target: null });
+});

@@ -1,0 +1,126 @@
+:root {
+  color-scheme: dark;
+  --rose: #a73559;
+  --rose-hover: #8b2948;
+  --region-line: #e184a1;
+  --plate: #18191d;
+  --on-plate: #f8f8fa;
+  --plate-muted: #b9bac3;
+  --plate-line: #44454e;
+  --scrim: rgb(24 25 29 / 45%);
+  font-family: "Noto Sans", "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  user-select: none;
+}
+
+/* Every pixel keeps nonzero alpha so the transparent window still receives pointer input. */
+.surface {
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+  touch-action: none;
+  outline: none;
+}
+
+.surface:has(.region-box[hidden]) {
+  background: var(--scrim);
+}
+
+.surface:focus-visible {
+  outline: 2px solid var(--region-line);
+  outline-offset: -2px;
+}
+
+.region-box {
+  position: absolute;
+  border: 2px solid var(--region-line);
+  background: rgb(167 53 89 / 10%);
+  box-shadow: 0 0 0 100vmax var(--scrim);
+  pointer-events: none;
+}
+
+.toolbar {
+  position: fixed;
+  left: 16px;
+  display: flex;
+  max-width: calc(100% - 32px);
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 12px 14px;
+  border: 1px solid var(--plate-line);
+  border-radius: 6px;
+  color: var(--on-plate);
+  background: var(--plate);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.toolbar[data-position="bottom"] {
+  bottom: 16px;
+}
+
+.toolbar[data-position="top"] {
+  top: 16px;
+}
+
+.toolbar-text {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.toolbar-text output,
+.keys {
+  color: var(--plate-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+}
+
+button {
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid var(--plate-line);
+  border-radius: 6px;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--plate-muted);
+}
+
+button.primary {
+  border-color: transparent;
+  color: #fff;
+  background: var(--rose);
+}
+
+button.primary:hover {
+  background: var(--rose-hover);
+}
+
+button:focus-visible {
+  outline: 2px solid var(--region-line);
+  outline-offset: 3px;
+}

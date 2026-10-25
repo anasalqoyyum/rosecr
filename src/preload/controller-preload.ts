@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld(
     command: (command: ControlCommand): Promise<ControlState> => ipcRenderer.invoke(IPC.command, command),
     listTargets: (): Promise<CaptureTarget[]> => ipcRenderer.invoke(IPC.listTargets),
     selectTarget: (sourceId: string): Promise<ControlState> => ipcRenderer.invoke(IPC.selectTarget, sourceId),
+    selectRegion: (): Promise<ControlState> => ipcRenderer.invoke(IPC.selectRegion),
     startCaptureProbe: (): Promise<ControlState> => ipcRenderer.invoke(IPC.startCaptureProbe),
     stopCaptureProbe: (): Promise<ControlState> => ipcRenderer.invoke(IPC.stopCaptureProbe),
     onStateChanged: (listener: (state: ControlState) => void): (() => void) => {

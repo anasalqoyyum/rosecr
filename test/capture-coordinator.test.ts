@@ -1,7 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { CaptureCoordinator, type CaptureWorkerReport } from '../src/main/capture-coordinator';
-import { createInitialState, reduceControlState, selectTarget } from '../src/main/control-state';
+import {
+  createInitialState,
+  reduceControlState,
+  regionSaved,
+  selectTarget,
+  type CaptureTarget,
+  type ControlState
+} from '../src/main/control-state';
+import { savedTargetFrom } from '../src/main/game-target';
 import { cloneDefaults } from '../src/main/settings-store';
 import type { WindowMetadata } from '../src/main/win32-metadata-client';
 
@@ -20,14 +28,20 @@ function metadata(left = 0, width = 800, dpi = 96): WindowMetadata {
   };
 }
 
-function fixture() {
-  let state = selectTarget(createInitialState(cloneDefaults()), { id: 'window:42:0', name: 'Game', nativeHandle: '42' });
+function gameWindow(handle: string): CaptureTarget {
+  return { id: `window:${handle}:0`, name: 'Game', nativeHandle: handle, processId: 7, executableName: 'game.exe', className: 'GameWindow' };
+}
+
+function fixture(initial: ControlState = selectTarget(createInitialState(cloneDefaults()), gameWindow('42'))) {
+  let state = initial;
   let visible = false;
   let generation = 0;
   const queries: string[] = [];
   const starts: string[] = [];
   const bounds: unknown[] = [];
   let query = async (_handle: string) => metadata();
+  let listTargets = async (): Promise<CaptureTarget[]> => [];
+  let lists = 0;
   let startReport: CaptureWorkerReport | undefined;
   let startResult: (() => Promise<CaptureWorkerReport | undefined>) | undefined;
   const dependencies = {
@@ -46,6 +60,7 @@ function fixture() {
       isVisible: () => visible, setBounds(value: unknown) { bounds.push(value); }
     },
     metadataClient: { query(handle: string) { queries.push(handle); return query(handle); } },
+    catalog: { listTargets() { lists++; return listTargets(); } },
     screen: { screenToDipPoint: (point: unknown) => point },
     getState: () => state,
     updateState: (update: (current: typeof state) => typeof state) => { state = update(state); },
@@ -54,9 +69,12 @@ function fixture() {
   const coordinator = new CaptureCoordinator(dependencies as unknown as ConstructorParameters<typeof CaptureCoordinator>[0]);
   return {
     coordinator, queries, starts, bounds,
-    get state() { return state; }, get visible() { return visible; },
+    get state() { return state; }, get visible() { return visible; }, get lists() { return lists; },
     setQuery(next: typeof query) { query = next; },
-    select(handle: string) { state = selectTarget(state, { id: `window:${handle}:0`, name: 'Game', nativeHandle: handle }); },
+    setWindows(next: CaptureTarget[] | (() => Promise<CaptureTarget[]>)) { listTargets = Array.isArray(next) ? async () => next : next; },
+    select(handle: string) { state = selectTarget(state, gameWindow(handle)); },
+    setRegion(region: ControlState['region'] & object) { state = regionSaved(state, region); },
+    setScope(scope: ControlState['scope']) { state = { ...state, scope }; },
     auto(enabled = true) { state = reduceControlState(state, { type: 'set-auto', enabled }); },
     clear() { state = reduceControlState(state, { type: 'clear-overlays' }); dependencies.overlayWindow.hide(); },
     frame(overrides: Partial<Extract<CaptureWorkerReport, { kind: 'frame' }>> = {}) {
@@ -328,7 +346,7 @@ test('retry queries do not overlap and cancelled or replaced watchers cannot res
   }
 });
 
-test('closed targets, one-shots, and Auto-off probes do not keep retry watchers', async (t) => {
+test('closed targets stop handle polling, and one-shots and Auto-off probes keep no watchers', async (t) => {
   t.mock.timers.enable({ apis: ['setInterval'] });
   for (const scenario of ['closed', 'closed-while-waiting', 'one-shot', 'probe'] as const) {
     const f = fixture();
@@ -348,6 +366,7 @@ test('closed targets, one-shots, and Auto-off probes do not keep retry watchers'
     assert.equal(f.queries.length, count);
     assert.equal(f.starts.length, 0);
     assert.equal(f.state.captureProbe.active, false);
+    assert.equal(f.state.gameTarget.kind, scenario.startsWith('closed') ? 'detached' : 'attached');
   }
 });
 
@@ -472,4 +491,161 @@ test('each capture starts with fresh frame metrics', async (t) => {
   await f.coordinator.start('continuous');
   assert.equal(f.state.status, 'waiting');
   assert.deepEqual(f.state.captureProbe, { active: false, frameCount: 0, firstFrameLatencyMs: null, frameSize: null, lastFrameAt: null });
+});
+
+async function settle(): Promise<void> {
+  for (let i = 0; i < 5; i++) await new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+const savedRegion = { x: 0.25, y: 0.5, width: 0.5, height: 0.25 };
+
+test('Auto reconnects a closed game when its window returns with a new handle, keeping the region', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.setRegion(savedRegion);
+  f.auto();
+  await f.coordinator.start('continuous');
+  f.frame();
+  f.setQuery(async () => ({ ...metadata(), capturable: false, exists: false, clientRect: null }));
+  t.mock.timers.tick(200);
+  await settle();
+  assert.equal(f.state.status, 'waiting');
+  assert.equal(f.state.autoEnabled, true);
+  assert.equal(f.visible, false);
+  assert.deepEqual(f.state.gameTarget, { kind: 'detached', saved: savedTargetFrom(gameWindow('42')) });
+
+  t.mock.timers.tick(1000);
+  await settle();
+  assert.equal(f.lists, 1);
+  assert.deepEqual(f.starts, ['window:42:0']);
+
+  f.setWindows([{ ...gameWindow('77'), executableName: 'other.exe' }, gameWindow('99')]);
+  f.setQuery(async () => metadata());
+  t.mock.timers.tick(1000);
+  await settle();
+  assert.deepEqual(f.starts, ['window:42:0', 'window:99:0']);
+  assert.deepEqual(f.state.gameTarget, { kind: 'attached', window: gameWindow('99') });
+  assert.deepEqual(f.state.region, savedRegion);
+  f.frame();
+  assert.equal(f.state.status, 'running');
+});
+
+test('ambiguous returning windows ask only for the window and keep the region', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.setRegion(savedRegion);
+  f.auto();
+  f.setQuery(async () => ({ ...metadata(), capturable: false, exists: false, clientRect: null }));
+  await f.coordinator.start('continuous');
+  const twins = [{ ...gameWindow('98'), name: 'Game A' }, { ...gameWindow('99'), name: 'Game B' }];
+  f.setWindows(twins);
+  t.mock.timers.tick(1000);
+  await settle();
+  assert.deepEqual(f.state.gameTarget, { kind: 'ambiguous', saved: savedTargetFrom(gameWindow('42')), candidates: twins });
+  assert.equal(f.state.statusMessage, 'Waiting: choose which game window to capture');
+  assert.equal(f.state.autoEnabled, true);
+  assert.deepEqual(f.state.region, savedRegion);
+  const lists = f.lists;
+  t.mock.timers.tick(3000);
+  await settle();
+  assert.equal(f.lists, lists);
+
+  f.select('99');
+  f.setQuery(async () => metadata());
+  await f.coordinator.start('continuous');
+  assert.deepEqual(f.starts, ['window:99:0']);
+  assert.deepEqual(f.state.region, savedRegion);
+});
+
+test('Play reattaches once when the saved handle belongs to a game that restarted', async (t) => {
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.setQuery(async (handle) => handle === '42' ? { ...metadata(), capturable: false, exists: false, clientRect: null } : metadata());
+  f.setWindows([gameWindow('99')]);
+  await f.coordinator.start('one-shot');
+  assert.deepEqual(f.queries, ['42', '99']);
+  assert.deepEqual(f.starts, ['window:99:0']);
+  f.frame();
+  assert.equal(f.state.status, 'idle');
+  assert.equal(f.state.statusMessage, 'Idle · capture probe passed');
+
+  const missing = fixture();
+  t.after(() => missing.coordinator.stop());
+  missing.setQuery(async () => ({ ...metadata(), capturable: false, exists: false, clientRect: null }));
+  await missing.coordinator.start('one-shot');
+  assert.deepEqual(missing.queries, ['42']);
+  assert.equal(missing.lists, 1);
+  assert.equal(missing.state.statusMessage, 'Waiting: game window not found');
+  assert.equal(missing.state.gameTarget.kind, 'detached');
+});
+
+test('a saved game restored at startup is located on Play without user selection', async (t) => {
+  const settings = cloneDefaults();
+  settings.target = savedTargetFrom(gameWindow('42'));
+  settings.region = savedRegion;
+  const f = fixture(createInitialState(settings));
+  t.after(() => f.coordinator.stop());
+  assert.equal(f.state.gameTarget.kind, 'detached');
+  f.setWindows([gameWindow('55')]);
+  await f.coordinator.start('one-shot');
+  assert.deepEqual(f.queries, ['55']);
+  assert.deepEqual(f.starts, ['window:55:0']);
+  assert.deepEqual(f.state.region, savedRegion);
+});
+
+test('the overlay covers the saved region and follows client movement and scaling', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.setRegion(savedRegion);
+  await f.coordinator.start('continuous');
+  assert.deepEqual(f.bounds.at(-1), { x: 200, y: 300, width: 400, height: 150 });
+  f.setQuery(async () => metadata(1000, 1600));
+  t.mock.timers.tick(200);
+  await settle();
+  assert.deepEqual(f.bounds.at(-1), { x: 1400, y: 300, width: 800, height: 150 });
+  f.setScope('window');
+  t.mock.timers.tick(200);
+  await settle();
+  assert.deepEqual(f.bounds.at(-1), { x: 1000, y: 0, width: 1600, height: 600 });
+});
+
+test('a capture error keeps the saved game and region', async (t) => {
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.setRegion(savedRegion);
+  f.setQuery(async () => { throw new Error('metadata helper crashed'); });
+  await f.coordinator.start('continuous');
+  assert.equal(f.state.status, 'error');
+  assert.deepEqual(f.state.gameTarget, { kind: 'attached', window: gameWindow('42') });
+  assert.deepEqual(f.state.region, savedRegion);
+
+  const listing = fixture(createInitialState({ ...cloneDefaults(), target: savedTargetFrom(gameWindow('42')), region: savedRegion }));
+  t.after(() => listing.coordinator.stop());
+  listing.setWindows(async () => { throw new Error('window list unavailable'); });
+  await listing.coordinator.start('one-shot');
+  assert.equal(listing.state.status, 'error');
+  assert.deepEqual(listing.state.gameTarget, { kind: 'detached', saved: savedTargetFrom(gameWindow('42')) });
+  assert.deepEqual(listing.state.region, savedRegion);
+});
+
+test('a failed window listing while reconnecting keeps Auto waiting for the game', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval'] });
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.auto();
+  f.setQuery(async () => ({ ...metadata(), capturable: false, exists: false, clientRect: null }));
+  await f.coordinator.start('continuous');
+  f.setWindows(async () => { throw new Error('Win32 metadata query timed out.'); });
+  t.mock.timers.tick(1000);
+  await settle();
+  assert.equal(f.state.status, 'waiting');
+  assert.equal(f.state.autoEnabled, true);
+  f.setWindows([gameWindow('99')]);
+  f.setQuery(async () => metadata());
+  t.mock.timers.tick(1000);
+  await settle();
+  assert.deepEqual(f.starts, ['window:99:0']);
 });

@@ -7,9 +7,9 @@ import { physicalClientRectToDip } from '../src/main/geometry';
 test('native target enumeration rejects every window owned by Rosecr', () => {
   const targets = nativeWindowsToCaptureTargets(
     [
-      { handle: '10', title: 'Rosecr', processId: 100 },
-      { handle: '11', title: 'Rosecr settings', processId: 100 },
-      { handle: '12', title: 'Game', processId: 200 }
+      { handle: '10', title: 'Rosecr', processId: 100, executableName: 'rosecr.exe', className: 'Chrome_WidgetWin_1' },
+      { handle: '11', title: 'Rosecr settings', processId: 100, executableName: 'rosecr.exe', className: 'Chrome_WidgetWin_1' },
+      { handle: '12', title: 'Game', processId: 200, executableName: 'game.exe', className: 'UnityWndClass' }
     ],
     100
   );
@@ -18,6 +18,9 @@ test('native target enumeration rejects every window owned by Rosecr', () => {
       id: 'window:12:0',
       name: 'Game',
       nativeHandle: '12',
+      processId: 200,
+      executableName: 'game.exe',
+      className: 'UnityWndClass',
       thumbnailDataUrl: null,
       iconDataUrl: null
     }
