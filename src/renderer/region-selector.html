@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'" />
+    <link rel="stylesheet" href="region-selector.css" />
+    <title>Rosecr region selector</title>
+  </head>
+  <body>
+    <div
+      class="surface"
+      id="surface"
+      tabindex="0"
+      aria-label="Capture region selector. Drag to draw. Arrow keys move, Shift plus arrow keys resize, Enter saves, Escape cancels, R resets."
+    >
+      <div class="region-box" id="region-box" hidden></div>
+    </div>
+    <div class="toolbar" id="toolbar" data-position="bottom">
+      <div class="toolbar-text">
+        <strong>Drag over the game text to capture</strong>
+        <output id="region-values" aria-live="polite"></output>
+        <span class="keys">Enter save · Esc cancel · R reset · Arrows move · Shift + arrows resize</span>
+      </div>
+      <div class="toolbar-actions">
+        <button type="button" id="reset">Reset</button>
+        <button type="button" id="cancel">Cancel</button>
+        <button type="button" class="primary" id="confirm">Save region</button>
+      </div>
+    </div>
+    <script src="region-selector.js"></script>
+  </body>
+</html>

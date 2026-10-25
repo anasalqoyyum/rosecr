@@ -1,13 +1,25 @@
 import type { CaptureScope, ControlCommand, ControlStatus, Direction, ShortcutAction } from '../shared/contracts';
+import type { NormalizedRegion } from '../shared/region';
+import { savedTargetFrom, type SavedGameTarget, type TargetResolution } from './game-target';
 import type { DurableSettings } from './settings-store';
 
 export interface CaptureTarget {
   id: string;
   name: string;
   nativeHandle: string;
+  processId: number;
+  executableName: string;
+  className: string;
   thumbnailDataUrl?: string | null;
   iconDataUrl?: string | null;
 }
+
+/** The saved game survives every state below; only the user choosing another window replaces it. */
+export type GameTargetState =
+  | { kind: 'unselected' }
+  | { kind: 'attached'; window: CaptureTarget }
+  | { kind: 'detached'; saved: SavedGameTarget }
+  | { kind: 'ambiguous'; saved: SavedGameTarget; candidates: CaptureTarget[] };
 
 export interface CaptureFrameReport {
   frameCount: number;
@@ -24,7 +36,8 @@ export interface ControlState {
   overlayVisible: boolean;
   direction: Direction;
   scope: CaptureScope;
-  selectedTarget: CaptureTarget | null;
+  gameTarget: GameTargetState;
+  region: NormalizedRegion | null;
   clearGeneration: number;
   refreshGeneration: number;
   shortcuts: Record<ShortcutAction, string | null>;
@@ -44,7 +57,8 @@ export function createInitialState(settings: DurableSettings): ControlState {
   return {
     status: 'idle', statusMessage: 'Idle', autoEnabled: false,
     overlayVisible: settings.overlayVisible, direction: settings.direction, scope: settings.scope,
-    selectedTarget: null, clearGeneration: 0, refreshGeneration: 0,
+    gameTarget: settings.target ? { kind: 'detached', saved: settings.target } : { kind: 'unselected' },
+    region: settings.region, clearGeneration: 0, refreshGeneration: 0,
     shortcuts: { ...settings.shortcuts }, shortcutConflicts: {},
     captureProbe: emptyCaptureProbe
   };
@@ -53,12 +67,12 @@ export function createInitialState(settings: DurableSettings): ControlState {
 export function reduceControlState(state: ControlState, command: ControlCommand): ControlState {
   switch (command.type) {
     case 'play':
-      if (!state.selectedTarget) return { ...state, status: 'waiting', statusMessage: 'Waiting: choose a game window' };
+      if (state.gameTarget.kind === 'unselected') return { ...state, status: 'waiting', statusMessage: 'Waiting: choose a game window' };
       if (state.autoEnabled) return { ...state, status: 'running', statusMessage: 'Watching · refresh requested', refreshGeneration: state.refreshGeneration + 1 };
       return { ...state, status: 'running', statusMessage: 'One-shot capture running', refreshGeneration: state.refreshGeneration + 1 };
     case 'set-auto':
       if (!command.enabled) return { ...state, autoEnabled: false, status: 'idle', statusMessage: 'Idle' };
-      if (!state.selectedTarget) return { ...state, autoEnabled: true, status: 'waiting', statusMessage: 'Waiting: choose a game window' };
+      if (state.gameTarget.kind === 'unselected') return { ...state, autoEnabled: true, status: 'waiting', statusMessage: 'Waiting: choose a game window' };
       return { ...state, autoEnabled: true, status: 'running', statusMessage: 'Watching' };
     case 'set-overlay-visible': return { ...state, overlayVisible: command.visible };
     case 'clear-overlays': return { ...state, clearGeneration: state.clearGeneration + 1 };
@@ -69,9 +83,37 @@ export function reduceControlState(state: ControlState, command: ControlCommand)
   }
 }
 
+export function attachedWindow(state: ControlState): CaptureTarget | null {
+  return state.gameTarget.kind === 'attached' ? state.gameTarget.window : null;
+}
+
+export function savedGameTarget(target: GameTargetState): SavedGameTarget | null {
+  switch (target.kind) {
+    case 'unselected': return null;
+    case 'attached': return savedTargetFrom(target.window);
+    case 'detached':
+    case 'ambiguous': return target.saved;
+  }
+}
+
 export function selectTarget(state: ControlState, target: CaptureTarget): ControlState {
   const status: ControlStatus = state.autoEnabled ? 'running' : 'idle';
-  return { ...state, selectedTarget: target, status, statusMessage: state.autoEnabled ? 'Watching' : 'Idle', clearGeneration: state.clearGeneration + 1 };
+  return { ...state, gameTarget: { kind: 'attached', window: target }, status, statusMessage: state.autoEnabled ? 'Watching' : 'Idle', clearGeneration: state.clearGeneration + 1 };
+}
+
+/** Applies a lookup of the saved game without touching the region or the runtime status. */
+export function targetResolved(state: ControlState, resolution: TargetResolution): ControlState {
+  const saved = savedGameTarget(state.gameTarget);
+  if (!saved) return state;
+  switch (resolution.kind) {
+    case 'unique': return { ...state, gameTarget: { kind: 'attached', window: resolution.window } };
+    case 'ambiguous': return { ...state, gameTarget: { kind: 'ambiguous', saved, candidates: resolution.candidates } };
+    case 'missing': return { ...state, gameTarget: { kind: 'detached', saved } };
+  }
+}
+
+export function regionSaved(state: ControlState, region: NormalizedRegion): ControlState {
+  return { ...state, region, clearGeneration: state.clearGeneration + 1, refreshGeneration: state.refreshGeneration + 1 };
 }
 
 export function captureStarting(state: ControlState): ControlState {

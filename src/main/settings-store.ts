@@ -9,12 +9,16 @@ import {
   type Direction,
   type ShortcutAction
 } from '../shared/contracts';
+import { parseNormalizedRegion, type NormalizedRegion } from '../shared/region';
+import { parseSavedGameTarget, type SavedGameTarget } from './game-target';
 
 export interface DurableSettings {
   direction: Direction;
   scope: CaptureScope;
   overlayVisible: boolean;
   shortcuts: Record<ShortcutAction, string | null>;
+  target: SavedGameTarget | null;
+  region: NormalizedRegion | null;
 }
 
 export const DEFAULT_SETTINGS: Readonly<DurableSettings> = Object.freeze({
@@ -26,7 +30,9 @@ export const DEFAULT_SETTINGS: Readonly<DurableSettings> = Object.freeze({
     auto: null,
     overlay: 'CommandOrControl+Alt+O',
     clear: null
-  })
+  }),
+  target: null,
+  region: null
 });
 
 export function cloneDefaults(): DurableSettings {
@@ -40,6 +46,8 @@ export function sanitizeSettings(value: unknown): DurableSettings {
   if (DIRECTIONS.includes(value.direction as Direction)) result.direction = value.direction as Direction;
   if (CAPTURE_SCOPES.includes(value.scope as CaptureScope)) result.scope = value.scope as CaptureScope;
   if (typeof value.overlayVisible === 'boolean') result.overlayVisible = value.overlayVisible;
+  result.target = parseSavedGameTarget(value.target);
+  result.region = parseNormalizedRegion(value.region);
   if (isRecord(value.shortcuts)) {
     for (const action of SHORTCUT_ACTIONS) {
       const accelerator = value.shortcuts[action];

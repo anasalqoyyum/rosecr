@@ -8,6 +8,8 @@ const assets = [
   'src/renderer/controller.html',
   'src/renderer/overlay.css',
   'src/renderer/overlay.html',
+  'src/renderer/region-selector.css',
+  'src/renderer/region-selector.html',
   'src/renderer/settings.html',
   'src/renderer/ui.css'
 ];

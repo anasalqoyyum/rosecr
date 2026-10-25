@@ -9,7 +9,7 @@ import { cloneDefaults } from '../src/main/settings-store';
 import { IPC } from '../src/shared/contracts';
 
 function loadPreload(name: string) {
-  const exposed: Partial<Pick<Window, 'rosecr' | 'captureProbe'>> = {};
+  const exposed: Partial<Pick<Window, 'rosecr' | 'captureProbe' | 'regionSelector'>> = {};
   const listeners = new EventEmitter();
   const invocations: unknown[][] = [];
   const reports: unknown[][] = [];
@@ -46,11 +46,12 @@ test('bundled controller preload initializes with sandbox require and preserves 
   await api.command(command);
   await api.listTargets();
   await api.selectTarget('window:42:0');
+  await api.selectRegion();
   await api.startCaptureProbe();
   await api.stopCaptureProbe();
   assert.deepEqual(f.invocations, [
     [IPC.getState], [IPC.command, command], [IPC.listTargets],
-    [IPC.selectTarget, 'window:42:0'], [IPC.startCaptureProbe], [IPC.stopCaptureProbe]
+    [IPC.selectTarget, 'window:42:0'], [IPC.selectRegion], [IPC.startCaptureProbe], [IPC.stopCaptureProbe]
   ]);
   const state = createInitialState(cloneDefaults());
   let calls = 0;
@@ -77,4 +78,18 @@ test('bundled capture preload initializes with sandbox require and delivers work
 
 test('bundled overlay preload initializes without local module imports', () => {
   assert.doesNotThrow(() => loadPreload('overlay'));
+});
+
+test('bundled region selector preload exposes only its session handshake', async () => {
+  const f = loadPreload('region-selector');
+  const api = f.exposed.regionSelector;
+  assert.ok(api);
+  assert.equal(await api.initial(), 'response');
+  api.finish({ kind: 'cancelled' });
+  assert.deepEqual(f.invocations, [[IPC.regionSelectorInit]]);
+  assert.deepEqual(f.reports, [[IPC.regionSelectorFinish, { kind: 'cancelled' }]]);
+});
+
+test('bundled region selector renderer has no module loader dependency', () => {
+  assert.doesNotMatch(readFileSync('dist/src/renderer/region-selector.js', 'utf8'), /\brequire\(/);
 });

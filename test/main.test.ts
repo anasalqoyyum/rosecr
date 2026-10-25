@@ -6,14 +6,18 @@ import test from 'node:test';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import type { ControlState } from '../src/main/control-state';
-import { cloneDefaults } from '../src/main/settings-store';
+import { cloneDefaults, type DurableSettings } from '../src/main/settings-store';
 import { IPC } from '../src/shared/contracts';
 
 function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
   smoke?: boolean;
   workerGate?: Promise<void>;
+  settings?: DurableSettings;
+  handles?: number[];
 } = {}) {
   const handlers = new Map<string, (event: unknown, payload?: unknown) => Promise<ControlState>>();
+  const ipcListeners = new Map<string, (event: unknown, payload?: unknown) => void>();
+  const saves: DurableSettings[] = [];
   const listeners = new Map<string, () => void>();
   const starts: string[] = [];
   const stops: string[] = [];
@@ -28,6 +32,8 @@ function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
   class FakeWindow {
     events = new Map<string, () => void>();
     visible = false;
+    destroyed = false;
+    bounds: unknown = null;
     broadcasts: ControlState[] = [];
     static getAllWindows() { return windows; }
     webContents = {
@@ -54,11 +60,18 @@ function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
     constructor() { windows.push(this); }
     loadFile() {}
     on(event: string, callback: () => void) { this.events.set(event, callback); }
-    isDestroyed() { return false; }
+    once(event: string, callback: () => void) { this.events.set(event, callback); }
+    isDestroyed() { return this.destroyed; }
+    close() {
+      this.destroyed = true;
+      this.events.get('closed')?.();
+    }
+    show() { this.visible = true; }
+    focus() {}
     setContentProtection() {}
     setIgnoreMouseEvents() {}
     setFocusable() {}
-    setBounds() {}
+    setBounds(bounds: unknown) { this.bounds = bounds; }
     isVisible() { return this.visible; }
     showInactive() { this.visible = true; }
     hide() { this.visible = false; }
@@ -97,21 +110,28 @@ function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
             handle: (channel: string, handler: (event: unknown, payload?: unknown) => Promise<ControlState>) => {
               handlers.set(channel, handler);
             },
-            on() {}
+            on: (channel: string, listener: (event: unknown, payload?: unknown) => void) => {
+              ipcListeners.set(channel, listener);
+            }
           },
           screen: { screenToDipPoint: (point: unknown) => point }
         };
         case './settings-store': return {
-          SettingsStore: class { load() { return cloneDefaults(); } save() {} }
+          SettingsStore: class {
+            load() { return structuredClone(options.settings ?? cloneDefaults()); }
+            save(settings: DurableSettings) { saves.push(structuredClone(settings)); }
+          }
         };
         case './win32-metadata-client': return {
           Win32MetadataClient: class {
             async list() {
-              return { windows: [42, 43].map((handle) => ({ handle: String(handle), title: 'Game', processId: -1 })) };
+              return { windows: (options.handles ?? [42, 43]).map((handle) => ({
+                handle: String(handle), title: 'Game', processId: -1, executableName: 'game.exe', className: 'GameWindow'
+              })) };
             }
             async query() {
               await queryGate;
-              return { capturable: true, clientRect: { left: 0, top: 0, right: 800, bottom: 600 } };
+              return { exists: true, capturable: true, clientRect: { left: 0, top: 0, right: 800, bottom: 600 } };
             }
           }
         };
@@ -121,7 +141,7 @@ function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
   });
 
   return {
-    startup, handlers, listeners, starts, stops, windows, timers,
+    startup, handlers, ipcListeners, listeners, saves, starts, stops, windows, timers,
     get activeSource() { return activeSource; },
     get quitCalls() { return quitCalls; },
     get readyCalls() { return readyCalls; },
@@ -148,7 +168,7 @@ test('Auto enabled before target selection starts capture and switching rebinds 
   assert.equal(first.captureProbe.active, true);
   assert.equal(main.activeSource, 'window:42:0');
   const second = await main.invoke(IPC.selectTarget, 'window:43:0');
-  assert.equal(second.selectedTarget?.id, 'window:43:0');
+  assert.equal(second.gameTarget.kind === 'attached' && second.gameTarget.window.id, 'window:43:0');
   assert.equal(second.captureProbe.active, true);
   assert.equal(main.activeSource, 'window:43:0');
   assert.equal(main.starts.length, 2);
@@ -274,4 +294,78 @@ test('smoke timeout stops capture and a late first frame cannot replace the erro
   assert.equal(state.captureProbe.active, false);
   assert.equal(state.captureProbe.frameCount, 0);
   assert.equal(main.windows[2].visible, false);
+});
+
+test('a region drawn over the chosen game persists with the target and reconnects after restart', async (t) => {
+  const main = loadMain();
+  t.after(() => main.dispose());
+  await main.startup;
+  await main.invoke(IPC.selectTarget, 'window:42:0');
+  const selecting = main.invoke(IPC.selectRegion);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const selector = main.windows[4];
+  assert.ok(selector);
+  assert.deepEqual(selector.bounds, { x: 0, y: 0, width: 800, height: 600 });
+  const sender = { sender: selector.webContents };
+  const init = await main.invoke(IPC.regionSelectorInit) as unknown;
+  assert.equal(init, null, 'other renderers cannot read the selector session');
+  assert.ok(await main.handlers.get(IPC.regionSelectorInit)?.(sender));
+  const region = { x: 0.2, y: 0.6, width: 0.6, height: 0.3 };
+  main.ipcListeners.get(IPC.regionSelectorFinish)?.(sender, { kind: 'confirmed', region });
+  const selected = await selecting;
+  assert.deepEqual(selected.region, region);
+  assert.equal(selector.destroyed, true);
+
+  const persisted = main.saves.at(-1);
+  assert.ok(persisted);
+  assert.deepEqual(persisted.region, region);
+  assert.deepEqual(persisted.target, { executableName: 'game.exe', className: 'GameWindow', title: 'Game', lastKnownHandle: '42' });
+
+  const restarted = loadMain(true, undefined, { settings: persisted, handles: [77] });
+  t.after(() => restarted.dispose());
+  await restarted.startup;
+  const restored = await restarted.invoke(IPC.getState);
+  assert.equal(restored.gameTarget.kind, 'detached');
+  assert.equal(restored.autoEnabled, false);
+  const played = await restarted.invoke(IPC.command, { type: 'play' });
+  assert.match(restarted.starts.at(-1) ?? '', /"sourceId":"window:77:0"/);
+  assert.deepEqual(played.region, region);
+  assert.equal(restarted.saves.at(-1)?.target?.lastKnownHandle, '77');
+});
+
+test('a restart with two matching windows asks for the window and keeps the region', async (t) => {
+  const settings = cloneDefaults();
+  settings.target = { executableName: 'game.exe', className: 'GameWindow', title: 'Old title', lastKnownHandle: '1' };
+  settings.region = { x: 0.2, y: 0.6, width: 0.6, height: 0.3 };
+  const main = loadMain(true, undefined, { settings });
+  t.after(() => main.dispose());
+  await main.startup;
+  const waiting = await main.invoke(IPC.command, { type: 'play' });
+  assert.equal(waiting.gameTarget.kind, 'ambiguous');
+  assert.equal(waiting.statusMessage, 'Waiting: choose which game window to capture');
+  assert.equal(main.starts.length, 0);
+  assert.ok(main.saves.every((saved) => saved.target && saved.region), 'no save drops the target or region');
+  await assert.rejects(main.invoke(IPC.selectRegion), /Choose which game window/);
+
+  const chosen = await main.invoke(IPC.selectTarget, 'window:43:0');
+  assert.equal(chosen.gameTarget.kind, 'attached');
+  assert.deepEqual(chosen.region, settings.region);
+  await main.invoke(IPC.command, { type: 'play' });
+  assert.match(main.starts.at(-1) ?? '', /"sourceId":"window:43:0"/);
+});
+
+test('choosing another game while the region request is pending discards that request', async (t) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const main = loadMain(true, gate);
+  t.after(() => main.dispose());
+  await main.startup;
+  await main.invoke(IPC.selectTarget, 'window:42:0');
+  const selecting = main.invoke(IPC.selectRegion);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  await main.invoke(IPC.selectTarget, 'window:43:0');
+  release();
+  await assert.rejects(selecting, /game window changed/);
+  assert.equal(main.windows.length, 4, 'no selector opens over the previous game');
+  assert.equal((await main.invoke(IPC.getState)).region, null);
 });

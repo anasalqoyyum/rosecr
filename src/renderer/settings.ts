@@ -1,5 +1,8 @@
 type SettingsState = import('../main/control-state').ControlState;
 type SettingsShortcutAction = import('../shared/contracts').ShortcutAction;
+type SettingsCaptureTarget = import('../main/control-state').CaptureTarget;
+type SettingsGameTarget = import('../main/control-state').GameTargetState;
+type SettingsRegion = import('../shared/region').NormalizedRegion;
 
 (() => {
   const shortcutLabels: Record<SettingsShortcutAction, string> = {
@@ -15,7 +18,78 @@ type SettingsShortcutAction = import('../shared/contracts').ShortcutAction;
   const targetSelect = getElement<HTMLSelectElement>('#target');
   const captureStatus = getElement<HTMLElement>('#capture-status');
   const shortcutFields = getElement<HTMLElement>('#shortcut-fields');
+  const targetStatus = getElement<HTMLElement>('#target-status');
+  const targetCandidates = getElement<HTMLElement>('#target-candidates');
+  const selectRegionButton = getElement<HTMLButtonElement>('#select-region');
   let currentState: SettingsState | null = null;
+
+  const describeRegion = (region: SettingsRegion): string =>
+    `x ${region.x.toFixed(2)} · y ${region.y.toFixed(2)} · w ${region.width.toFixed(2)} · h ${region.height.toFixed(2)}`;
+
+  const describeWindow = (title: string, executableName: string): string =>
+    executableName ? `${title} (${executableName})` : title;
+
+  function showCaptureError(error: unknown): void {
+    captureStatus.textContent = error instanceof Error ? error.message : String(error);
+    captureStatus.dataset.status = 'error';
+  }
+
+  function chooseTarget(id: string): void {
+    void window.rosecr.selectTarget(id).catch(showCaptureError);
+  }
+
+  function renderTarget(target: SettingsGameTarget): void {
+    const summary = getElement<HTMLElement>('#target-summary');
+    let candidates: SettingsCaptureTarget[] = [];
+    switch (target.kind) {
+      case 'unselected':
+        summary.textContent = 'Choose the game window to capture.';
+        delete targetStatus.dataset.status;
+        break;
+      case 'attached':
+        summary.textContent = `Saved game: ${describeWindow(target.window.name, target.window.executableName)}. It stays saved through restarts and errors.`;
+        targetStatus.dataset.status = 'running';
+        break;
+      case 'detached':
+        summary.textContent = `Saved game: ${describeWindow(target.saved.title, target.saved.executableName)}. The window is not open; Rosecr reconnects when it returns.`;
+        targetStatus.dataset.status = 'waiting';
+        break;
+      case 'ambiguous':
+        summary.textContent = `${target.candidates.length} open windows match ${describeWindow(target.saved.title, target.saved.executableName)}. Choose the one to capture. Your region is kept.`;
+        targetStatus.dataset.status = 'waiting';
+        candidates = target.candidates;
+        break;
+      default: {
+        const unhandled: never = target;
+        throw new Error(`Unknown game target state: ${JSON.stringify(unhandled)}`);
+      }
+    }
+    targetCandidates.hidden = candidates.length === 0;
+    targetCandidates.replaceChildren(...candidates.map((candidate) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = `${candidate.name} · PID ${candidate.processId}`;
+      button.addEventListener('click', () => chooseTarget(candidate.id));
+      return button;
+    }));
+  }
+
+  function renderRegion(state: SettingsState): void {
+    const previewBox = getElement<HTMLElement>('#region-preview-box');
+    const region = state.region;
+    getElement<HTMLElement>('#region-summary').textContent = region
+      ? `${describeRegion(region)} of the game client area.`
+      : 'No region saved. Draw one over the game window.';
+    previewBox.hidden = !region;
+    if (region) {
+      previewBox.style.left = `${region.x * 100}%`;
+      previewBox.style.top = `${region.y * 100}%`;
+      previewBox.style.width = `${region.width * 100}%`;
+      previewBox.style.height = `${region.height * 100}%`;
+    }
+    selectRegionButton.textContent = region ? 'Reselect' : 'Select region';
+    selectRegionButton.disabled = state.gameTarget.kind === 'unselected';
+  }
 
   function showPage(page: string | undefined): void {
     if (!page) return;
@@ -67,7 +141,14 @@ type SettingsShortcutAction = import('../shared/contracts').ShortcutAction;
     captureStatus.textContent = state.statusMessage;
     captureStatus.dataset.status = state.status;
     getElement<HTMLElement>('#diagnostic-state').textContent = state.statusMessage;
-    getElement<HTMLElement>('#diagnostic-target').textContent = state.selectedTarget?.name ?? 'Not selected';
+    const target = state.gameTarget;
+    getElement<HTMLElement>('#diagnostic-target').textContent =
+      target.kind === 'unselected' ? 'Not selected'
+        : target.kind === 'attached' ? target.window.name
+          : `${target.saved.title} (not connected)`;
+    getElement<HTMLElement>('#diagnostic-region').textContent = state.region ? describeRegion(state.region) : 'Not saved';
+    renderTarget(target);
+    renderRegion(state);
     getElement<HTMLElement>('#diagnostic-frames').textContent = String(state.captureProbe.frameCount);
     getElement<HTMLElement>('#diagnostic-latency').textContent = state.captureProbe.firstFrameLatencyMs === null
       ? '—' : `${state.captureProbe.firstFrameLatencyMs} ms`;
@@ -82,11 +163,10 @@ type SettingsShortcutAction = import('../shared/contracts').ShortcutAction;
       const targets = await window.rosecr.listTargets();
       targetSelect.replaceChildren(new Option('Choose a window', ''));
       for (const target of targets) targetSelect.add(new Option(target.name, target.id));
-      if (currentState?.selectedTarget) targetSelect.value = currentState.selectedTarget.id;
+      if (currentState?.gameTarget.kind === 'attached') targetSelect.value = currentState.gameTarget.window.id;
       captureStatus.textContent = targets.length ? 'Choose a window to run the M0 capture probe.' : 'No capturable windows found.';
     } catch (error) {
-      captureStatus.textContent = error instanceof Error ? error.message : String(error);
-      captureStatus.dataset.status = 'error';
+      showCaptureError(error);
     }
   }
 
@@ -110,17 +190,15 @@ type SettingsShortcutAction = import('../shared/contracts').ShortcutAction;
   });
   getElement<HTMLButtonElement>('#refresh-targets').addEventListener('click', () => void refreshTargets());
   targetSelect.addEventListener('change', () => {
-    if (!targetSelect.value) return;
-    void window.rosecr.selectTarget(targetSelect.value).catch((error: unknown) => {
-      captureStatus.textContent = error instanceof Error ? error.message : String(error);
-      captureStatus.dataset.status = 'error';
-    });
+    if (targetSelect.value) chooseTarget(targetSelect.value);
+  });
+  selectRegionButton.addEventListener('click', () => {
+    captureStatus.textContent = 'Draw the region over the game window. Enter saves, Esc cancels.';
+    delete captureStatus.dataset.status;
+    void window.rosecr.selectRegion().catch(showCaptureError);
   });
   getElement<HTMLButtonElement>('#start-probe').addEventListener('click', () => {
-    void window.rosecr.startCaptureProbe().catch((error: unknown) => {
-      captureStatus.textContent = error instanceof Error ? error.message : String(error);
-      captureStatus.dataset.status = 'error';
-    });
+    void window.rosecr.startCaptureProbe().catch(showCaptureError);
   });
   getElement<HTMLButtonElement>('#stop-probe').addEventListener('click', () => void window.rosecr.stopCaptureProbe());
 

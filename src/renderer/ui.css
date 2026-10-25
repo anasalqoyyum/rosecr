@@ -269,6 +269,46 @@ button:disabled {
   line-height: 1.5;
 }
 
+.target-status p {
+  margin: 0;
+}
+
+.candidate-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.candidate-list button {
+  padding: 0 12px;
+}
+
+.region-row .inline-controls {
+  align-items: center;
+}
+
+.region-row button {
+  padding: 0 14px;
+  white-space: nowrap;
+}
+
+.region-preview {
+  position: relative;
+  width: 96px;
+  flex-shrink: 0;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: #0b0b0b;
+}
+
+.region-preview-box {
+  position: absolute;
+  border: 1px solid #e184a1;
+  background: rgb(167 53 89 / 25%);
+}
+
 .notice[data-status="running"] {
   border-color: #216a5c;
   color: #cbfff4;

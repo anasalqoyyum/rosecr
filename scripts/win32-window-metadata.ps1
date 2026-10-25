@@ -26,6 +26,26 @@ namespace Rosecr {
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowTextLength(IntPtr hWnd);
         [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
         [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, StringBuilder name, int count);
+        [DllImport("kernel32.dll")] public static extern IntPtr OpenProcess(uint access, bool inheritHandle, uint processId);
+        [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr handle);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, EntryPoint = "QueryFullProcessImageNameW")]
+        public static extern bool QueryFullProcessImageName(IntPtr process, uint flags, StringBuilder path, ref uint size);
+
+        // Limited query access reads only the image path; it cannot read memory or modify the process.
+        const uint ProcessQueryLimitedInformation = 0x1000;
+
+        static string ExecutableName(uint processId) {
+            var process = OpenProcess(ProcessQueryLimitedInformation, false, processId);
+            if (process == IntPtr.Zero) return "";
+            try {
+                uint size = 1024;
+                var path = new StringBuilder((int)size);
+                return QueryFullProcessImageName(process, 0, path, ref size) ? System.IO.Path.GetFileName(path.ToString()) : "";
+            } finally {
+                CloseHandle(process);
+            }
+        }
 
         public static object[] ListWindows() {
             var windows = new List<object>();
@@ -36,7 +56,15 @@ namespace Rosecr {
                 GetWindowText(handle, title, title.Capacity);
                 uint processId;
                 GetWindowThreadProcessId(handle, out processId);
-                windows.Add(new { handle = handle.ToInt64().ToString(), title = title.ToString(), processId });
+                var className = new StringBuilder(256);
+                GetClassName(handle, className, className.Capacity);
+                windows.Add(new {
+                    handle = handle.ToInt64().ToString(),
+                    title = title.ToString(),
+                    processId,
+                    executableName = ExecutableName(processId),
+                    className = className.ToString()
+                });
                 return true;
             }, IntPtr.Zero);
             return windows.ToArray();

@@ -47,12 +47,26 @@
               <button type="button" id="refresh-targets">Refresh</button>
             </div>
           </div>
+          <div class="notice target-status" id="target-status" role="status">
+            <p id="target-summary">Choose the game window to capture.</p>
+            <div class="candidate-list" id="target-candidates" hidden></div>
+          </div>
           <div class="form-row">
             <div><label for="capture-scope">Scope</label></div>
             <select id="capture-scope">
               <option value="region">Selected region</option>
               <option value="window">Whole game window</option>
             </select>
+          </div>
+          <div class="form-row region-row">
+            <div>
+              <label for="select-region">Capture region</label>
+              <p id="region-summary">No region saved.</p>
+            </div>
+            <div class="inline-controls">
+              <div class="region-preview" aria-hidden="true"><div class="region-preview-box" id="region-preview-box" hidden></div></div>
+              <button type="button" id="select-region">Select region</button>
+            </div>
           </div>
           <div class="probe-actions">
             <button class="primary-button" type="button" id="start-probe">Start capture probe</button>
@@ -89,6 +103,7 @@
           <dl class="diagnostics-list">
             <div><dt>Runtime</dt><dd id="diagnostic-state">Idle</dd></div>
             <div><dt>Target</dt><dd id="diagnostic-target">Not selected</dd></div>
+            <div><dt>Region</dt><dd id="diagnostic-region">Not saved</dd></div>
             <div><dt>Frames</dt><dd id="diagnostic-frames">0</dd></div>
             <div><dt>First frame</dt><dd id="diagnostic-latency">—</dd></div>
             <div><dt>Frame size</dt><dd id="diagnostic-size">—</dd></div>
@@ -100,7 +115,7 @@
         <section data-section="about" hidden>
           <h1>About</h1>
           <p class="section-copy">Rosecr 0.0.1 · Milestone 0 Windows foundation</p>
-          <p class="section-copy">No OCR, credentials, providers, or Milestone 1 capture persistence are included.</p>
+          <p class="section-copy">No OCR, credentials, or providers are included.</p>
         </section>
       </main>
     </div>
