@@ -17,6 +17,14 @@ test('a dragged region is clamped to the client area in either drag direction', 
   assert.equal(meetsMinimumSize(DEFAULT_REGION), true);
 });
 
+test('every drag to a client edge stays within bounds after rounding', () => {
+  const width = 1280;
+  for (let start = 0; start < width; start++) {
+    const region = regionFromPoints({ x: start / width, y: start / width }, { x: 1, y: 1 });
+    if (meetsMinimumSize(region)) assert.ok(parseNormalizedRegion(region), JSON.stringify(region));
+  }
+});
+
 test('keyboard adjustment moves and resizes without leaving the client area', () => {
   const region = { x: 0.9, y: 0, width: 0.1, height: 0.5 };
   assert.deepEqual(adjustRegion(region, { dx: 0.01, dy: -0.01, resize: false }), region);

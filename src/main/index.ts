@@ -150,7 +150,7 @@ async function selectRegion(): Promise<ControlState> {
     throw new Error('Restore the game window, then select the region.');
   }
   const bounds = physicalClientRectToDip(metadata.clientRect, (point) => screen.screenToDipPoint(point));
-  const selection = await regionSelector.open(bounds, state.region);
+  const selection = await regionSelector.open({ clientBounds: bounds, savedRegion: state.region, covering: settingsWindow });
   if (selection.kind === 'cancelled') return state;
   updateState((current) => regionSaved(current, selection.region));
   overlayWindow?.hide();

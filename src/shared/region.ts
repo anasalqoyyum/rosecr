@@ -26,13 +26,14 @@ const round = (value: number): number => Math.round(value * PRECISION) / PRECISI
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 
 export function regionFromPoints(start: NormalizedPoint, end: NormalizedPoint): NormalizedRegion {
-  const x1 = clamp(start.x, 0, 1);
-  const y1 = clamp(start.y, 0, 1);
-  const x2 = clamp(end.x, 0, 1);
-  const y2 = clamp(end.y, 0, 1);
+  // Rounding the edges rather than the size keeps x + width within the client area.
+  const x1 = round(clamp(start.x, 0, 1));
+  const y1 = round(clamp(start.y, 0, 1));
+  const x2 = round(clamp(end.x, 0, 1));
+  const y2 = round(clamp(end.y, 0, 1));
   return {
-    x: round(Math.min(x1, x2)),
-    y: round(Math.min(y1, y2)),
+    x: Math.min(x1, x2),
+    y: Math.min(y1, y2),
     width: round(Math.abs(x2 - x1)),
     height: round(Math.abs(y2 - y1))
   };

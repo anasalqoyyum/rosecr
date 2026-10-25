@@ -33,12 +33,21 @@ export class RegionSelector {
 
   constructor(private readonly createWindow: () => BrowserWindow) {}
 
-  open(clientBounds: Rectangle, savedRegion: NormalizedRegion | null): Promise<RegionSelection> {
+  /**
+   * `covering` is a Rosecr window that may sit over the game. It is hidden only after the selector
+   * has focus, so Windows does not hand the foreground to another app first, and shown again afterwards.
+   */
+  open({ clientBounds, savedRegion, covering }: {
+    clientBounds: Rectangle;
+    savedRegion: NormalizedRegion | null;
+    covering: BrowserWindow | null;
+  }): Promise<RegionSelection> {
     if (this.session) {
       this.session.window.focus();
       return this.session.result;
     }
     const window = this.createWindow();
+    const restoreCovering = covering?.isVisible() ? covering : null;
     let settle!: (selection: RegionSelection) => void;
     const result = new Promise<RegionSelection>((resolve) => { settle = resolve; });
     const session: Session = {
@@ -50,6 +59,7 @@ export class RegionSelector {
         this.session = null;
         settle(selection);
         if (!window.isDestroyed()) window.close();
+        if (restoreCovering && !restoreCovering.isDestroyed()) restoreCovering.show();
       }
     };
     this.session = session;
@@ -60,6 +70,7 @@ export class RegionSelector {
     window.once('ready-to-show', () => {
       window.show();
       window.focus();
+      restoreCovering?.hide();
     });
     return result;
   }
