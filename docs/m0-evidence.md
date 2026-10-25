@@ -2,7 +2,7 @@
 
 ## Completion State
 
-Milestone 0 is complete. Every milestone exit criterion and both TODO acceptance sets have recorded evidence. The capture spike proves Electron frame delivery and overlay-window behavior, while the missing production metadata and device-recovery controls require a thin native Windows helper.
+TODO-001 is complete. TODO-002 has three open items: captured-output inspection for overlay exclusion, a live blank or protected-target run, and device-loss evidence, which is assigned to the native helper. The capture spike proves Electron frame delivery and overlay-window behavior, while the missing production metadata and device-recovery controls require a thin native Windows helper.
 
 ## TODO-001
 
