@@ -38,13 +38,15 @@ export interface ControlState {
   };
 }
 
+const emptyCaptureProbe: ControlState['captureProbe'] = { active: false, frameCount: 0, firstFrameLatencyMs: null, frameSize: null, lastFrameAt: null };
+
 export function createInitialState(settings: DurableSettings): ControlState {
   return {
     status: 'idle', statusMessage: 'Idle', autoEnabled: false,
     overlayVisible: settings.overlayVisible, direction: settings.direction, scope: settings.scope,
     selectedTarget: null, clearGeneration: 0, refreshGeneration: 0,
     shortcuts: { ...settings.shortcuts }, shortcutConflicts: {},
-    captureProbe: { active: false, frameCount: 0, firstFrameLatencyMs: null, frameSize: null, lastFrameAt: null }
+    captureProbe: emptyCaptureProbe
   };
 }
 
@@ -70,6 +72,10 @@ export function reduceControlState(state: ControlState, command: ControlCommand)
 export function selectTarget(state: ControlState, target: CaptureTarget): ControlState {
   const status: ControlStatus = state.autoEnabled ? 'running' : 'idle';
   return { ...state, selectedTarget: target, status, statusMessage: state.autoEnabled ? 'Watching' : 'Idle', clearGeneration: state.clearGeneration + 1 };
+}
+
+export function captureStarting(state: ControlState): ControlState {
+  return { ...state, captureProbe: emptyCaptureProbe };
 }
 
 export function targetUnavailable(state: ControlState, reason: string): ControlState {

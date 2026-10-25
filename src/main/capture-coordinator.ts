@@ -4,6 +4,7 @@ import {
   type CaptureFrameReport,
   type ControlState,
   captureFrameReported,
+  captureStarting,
   runtimeError,
   targetUnavailable
 } from './control-state';
@@ -68,6 +69,7 @@ export class CaptureCoordinator {
       return;
     }
     this.stop();
+    this.updateState(captureStarting);
     const generation = this.generation;
     this.active = true;
     this.outputClearGeneration = this.getState().clearGeneration;
@@ -81,20 +83,16 @@ export class CaptureCoordinator {
       await new Promise<void>((resolve) => this.captureWindow.webContents.once('did-finish-load', () => resolve()));
     }
     if (generation !== this.generation || !(await this.refreshGeometry(target.nativeHandle, generation))) return;
+    this.usableFrameDeadline = setTimeout(() => this.waitForTarget('no usable frames from target'), USABLE_FRAME_DEADLINE_MS);
+    if (mode === 'continuous') this.metadataTimer = setInterval(() => void this.refreshGeometry(target.nativeHandle, generation), 200);
     try {
       const report = await this.captureWindow.webContents.executeJavaScript(
         `window.captureProbeRuntime.start(${JSON.stringify({ frameRate: 60, sourceId: target.id, captureGeneration: generation })})`
       ) as CaptureWorkerReport | undefined;
-      if (generation !== this.generation) return;
-      this.usableFrameDeadline = setTimeout(() => this.waitForTarget('no usable frames from target'), USABLE_FRAME_DEADLINE_MS);
-      if (report) this.handleWorkerReport(report);
+      if (generation === this.generation && report) this.handleWorkerReport(report);
     } catch (error) {
-      if (generation !== this.generation) return;
-      this.stop();
-      this.updateState((state) => runtimeError(state, error instanceof Error ? error.message : 'capture worker failed to start'));
-      return;
+      if (generation === this.generation) this.waitForTarget(error instanceof Error ? error.message : 'capture worker failed to start');
     }
-    if (generation === this.generation && mode === 'continuous') this.metadataTimer = setInterval(() => void this.refreshGeometry(target.nativeHandle, generation), 200);
   }
 
   stop(clearOverlay = true): void {

@@ -29,6 +29,7 @@ function fixture() {
   const bounds: unknown[] = [];
   let query = async (_handle: string) => metadata();
   let startReport: CaptureWorkerReport | undefined;
+  let startResult: (() => Promise<CaptureWorkerReport | undefined>) | undefined;
   const dependencies = {
     captureWindow: { webContents: {
       isLoading: () => false, send() {},
@@ -37,7 +38,7 @@ function fixture() {
         const options = JSON.parse(script.slice(script.indexOf('(') + 1, -1));
         generation = options.captureGeneration;
         starts.push(options.sourceId);
-        return startReport;
+        return startResult ? startResult() : startReport;
       }
     } },
     overlayWindow: {
@@ -62,7 +63,8 @@ function fixture() {
       coordinator.handleWorkerReport({ kind: 'frame', captureGeneration: generation, blank: false, frameCount: 1,
         width: 800, height: 600, timestamp: Date.now(), ...overrides });
     },
-    setStartReport(report: CaptureWorkerReport) { startReport = report; }
+    setStartReport(report: CaptureWorkerReport) { startReport = report; },
+    setStartResult(next: typeof startResult) { startResult = next; }
   };
 }
 
@@ -419,4 +421,55 @@ test('a capture with no usable frame enters waiting instead of running indefinit
     t.mock.timers.tick(10000);
     assert.notEqual(f.state.status, 'waiting');
   }
+});
+
+test('a stalled worker startup times out and Auto keeps polling the target meanwhile', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: 1000 });
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.auto();
+  f.setStartResult(() => new Promise(() => {}));
+  void f.coordinator.start('continuous');
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  f.setQuery(async () => ({ ...metadata(), capturable: false, minimized: true }));
+  t.mock.timers.tick(200);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(f.state.statusMessage, 'Waiting: target is minimized');
+
+  f.auto(false);
+  f.coordinator.stop();
+  f.setQuery(async () => metadata());
+  void f.coordinator.start('one-shot');
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  t.mock.timers.tick(5000);
+  assert.equal(f.state.statusMessage, 'Waiting: no usable frames from target');
+});
+
+test('a rejected worker startup waits and lets Auto reattach', async (t) => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: 1000 });
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  f.auto();
+  f.setStartResult(async () => { throw new Error('Could not start video source'); });
+  await f.coordinator.start('continuous');
+  assert.equal(f.state.statusMessage, 'Waiting: Could not start video source');
+  assert.equal(f.state.autoEnabled, true);
+  f.setStartResult(undefined);
+  t.mock.timers.tick(200);
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  assert.equal(f.starts.length, 2);
+  f.frame();
+  assert.equal(f.state.status, 'running');
+});
+
+test('each capture starts with fresh frame metrics', async (t) => {
+  const f = fixture();
+  t.after(() => f.coordinator.stop());
+  await f.coordinator.start('continuous');
+  f.frame({ frameCount: 5, firstFrameLatencyMs: 90 });
+  f.select('43');
+  f.setQuery(async () => ({ ...metadata(), capturable: false, exists: false }));
+  await f.coordinator.start('continuous');
+  assert.equal(f.state.status, 'waiting');
+  assert.deepEqual(f.state.captureProbe, { active: false, frameCount: 0, firstFrameLatencyMs: null, frameSize: null, lastFrameAt: null });
 });
