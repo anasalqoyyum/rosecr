@@ -1,0 +1,116 @@
+{
+  "ja-horizontal": {
+    "width": 960,
+    "height": 240,
+    "boxes": [
+      {
+        "text": "今日はいい天気ですね。",
+        "orientation": "horizontal",
+        "rect": [
+          64,
+          59,
+          440,
+          36
+        ]
+      },
+      {
+        "text": "少し散歩に行きませんか？",
+        "orientation": "horizontal",
+        "rect": [
+          64,
+          131,
+          480,
+          37
+        ]
+      }
+    ]
+  },
+  "ja-vertical": {
+    "width": 360,
+    "height": 560,
+    "boxes": [
+      {
+        "text": "吾輩は猫である。",
+        "orientation": "vertical",
+        "rect": [
+          248,
+          56,
+          38,
+          320
+        ]
+      },
+      {
+        "text": "名前はまだ無い。",
+        "orientation": "vertical",
+        "rect": [
+          172,
+          56,
+          37,
+          320
+        ]
+      }
+    ]
+  },
+  "en-horizontal": {
+    "width": 960,
+    "height": 240,
+    "boxes": [
+      {
+        "text": "The bridge to the east is closed.",
+        "orientation": "horizontal",
+        "rect": [
+          64,
+          62,
+          660,
+          34
+        ]
+      },
+      {
+        "text": "Talk to the guard first.",
+        "orientation": "horizontal",
+        "rect": [
+          64,
+          134,
+          480,
+          34
+        ]
+      }
+    ]
+  },
+  "mixed-orientation": {
+    "width": 480,
+    "height": 600,
+    "boxes": [
+      {
+        "text": "Quest Log クエスト",
+        "orientation": "horizontal",
+        "rect": [
+          56,
+          39,
+          288,
+          29
+        ]
+      },
+      {
+        "text": "西の森へ行く。",
+        "orientation": "vertical",
+        "rect": [
+          368,
+          120,
+          38,
+          280
+        ]
+      },
+      {
+        "text": "宝箱を開ける。",
+        "orientation": "vertical",
+        "rect": [
+          292,
+          120,
+          38,
+          280
+        ]
+      }
+    ]
+  }
+}

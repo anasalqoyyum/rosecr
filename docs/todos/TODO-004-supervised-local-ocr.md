@@ -14,7 +14,7 @@
 
 ## What to build
 
-Connect captured game-region frames to bundled `owocr` through a supervised Python sidecar and render positioned debug boxes so local OCR behavior, confidence, orientation, and recovery are visible end to end.
+Connect captured game-region frames to bundled RapidOCR through a supervised Python sidecar and render positioned debug boxes so local OCR behavior, confidence, orientation, and recovery are visible end to end.
 
 ## Acceptance criteria
 

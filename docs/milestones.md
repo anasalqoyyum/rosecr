@@ -35,8 +35,8 @@ Slices:
 Exit criteria:
 
 - A game and client-relative region can be selected, previewed, persisted, and reattached.
-- The bundled Python sidecar communicates over typed stdio and restarts at most once after a crash.
-- `owocr` returns positioned horizontal and vertical boxes with confidence.
+- The bundled Python sidecar communicates over typed stdio and restarts at most once after a crash, regaining the restart only after five minutes of healthy uptime.
+- RapidOCR returns positioned horizontal and vertical boxes with confidence.
 - OCR debug overlays stay aligned across movement, resizing, and DPI changes.
 
 ## M2 First Codex Translation

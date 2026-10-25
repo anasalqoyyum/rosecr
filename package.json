@@ -9,6 +9,8 @@
     "build": "tsc && node dist/scripts/build-preloads.js && node dist/scripts/copy-assets.js",
     "start": "pnpm run build && electron .",
     "test": "tsx --test test/*.test.ts",
+    "test:ocr": "uv run --directory sidecar python -m pytest -q && tsx --test test/ocr/*.test.ts",
+    "bench:ocr": "tsx scripts/ocr-benchmark.ts",
     "typecheck": "tsc --noEmit",
     "probe:sources": "pnpm run build && electron dist/scripts/enumerate-electron-sources.js",
     "probe:capture": "pnpm run build && electron dist/scripts/electron-capture-probe.js",

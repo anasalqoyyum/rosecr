@@ -27,7 +27,7 @@ Onboarding uses a short linear flow and ends with a one-shot validation.
 | Rosecr setup                                              2 / 6 |
 +----------------------------------------------------------------+
 | OCR assets                                                     |
-| owocr-japanese  v1.0       428 MB                               |
+| ppocr-japanese  v1.0        31 MB                               |
 | [####################..........]  67%   [Pause]                 |
 |                                                                |
 | Checksum verified after download                               |
