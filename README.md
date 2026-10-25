@@ -22,6 +22,7 @@ Exclusive fullscreen, whole-desktop capture, manual inspect, dictionary cards, o
 - [Technical architecture](docs/architecture.md)
 - [UI direction](docs/ui-direction.md)
 - [Wireframes](docs/wireframes.md)
+- [Design foundation](docs/design-foundation.html), with tokens in [DESIGN.md](DESIGN.md) and product context in [PRODUCT.md](PRODUCT.md)
 - [Implementation milestones](docs/milestones.md)
 - [Vertical-slice todos](docs/todos/README.md)
 
