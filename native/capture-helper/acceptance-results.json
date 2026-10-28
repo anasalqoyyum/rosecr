@@ -1,0 +1,66 @@
+{
+  "recordedAt": "2026-10-29",
+  "implementationHost": "Linux x64",
+  "windowsAcceptance": "pending",
+  "portableChecks": {
+    "pnpmInstallFrozenLockfile": "passed; authorized during implementation; pnpm-lock.yaml unchanged",
+    "typecheck": "passed",
+    "typescriptTests": {
+      "passed": 101,
+      "failed": 0
+    },
+    "typescriptBuild": "passed",
+    "rustProtocolTests": {
+      "passed": 5,
+      "failed": 0
+    },
+    "rustFormatting": "passed"
+  },
+  "windowsBuild": {
+    "status": "blocked on this host",
+    "reason": "Windows Rust target and MSVC are absent; offline cargo check cannot find the uncached windows 0.62.2 crate. Windows-specific source has not been compiled."
+  },
+  "scenarios": [
+    {
+      "name": "2560x1440 whole-client first frame and grab latency",
+      "status": "pending",
+      "artifactPaths": []
+    },
+    {
+      "name": "2560x1440 normalized-region first frame and grab latency",
+      "status": "pending",
+      "artifactPaths": []
+    },
+    {
+      "name": "saved-region marker, move, resize, and mixed-DPI alignment",
+      "status": "pending",
+      "artifactPaths": []
+    },
+    {
+      "name": "captured-frame overlay exclusion with content protection enabled",
+      "status": "pending",
+      "artifactPaths": []
+    },
+    {
+      "name": "captured-frame overlay exclusion with content protection disabled",
+      "status": "pending",
+      "artifactPaths": []
+    },
+    {
+      "name": "protected-target Waiting with settings retained",
+      "status": "pending",
+      "artifactPaths": []
+    },
+    {
+      "name": "forced device loss, new epoch, and fresh-frame recovery",
+      "status": "pending",
+      "artifactPaths": []
+    },
+    {
+      "name": "visible border behavior and consent from unpackaged helper",
+      "status": "pending",
+      "artifactPaths": []
+    }
+  ],
+  "externalUpdates": "none"
+}
