@@ -1,13 +1,15 @@
 import fs from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import {
   app,
   BrowserWindow,
   globalShortcut,
   ipcMain,
+  nativeImage,
   screen
 } from 'electron';
-import { CaptureCoordinator, type CaptureWorkerReport } from './capture-coordinator';
+import { CaptureCoordinator } from './capture-coordinator';
 import {
   attachedWindow,
   createInitialState,
@@ -26,7 +28,7 @@ import { physicalClientRectToDip } from './geometry';
 import { RegionSelector } from './region-selector';
 import { SettingsStore, type DurableSettings } from './settings-store';
 import { ShortcutManager } from './shortcut-manager';
-import { Win32MetadataClient } from './win32-metadata-client';
+import { NativeCaptureClient, nativeHelperPath } from './native-capture-client';
 import { protectWindow, secureWebPreferences } from './window-utils';
 import { IPC, parseControlCommand, type ControlCommand, type ShortcutAction } from '../shared/contracts';
 
@@ -36,16 +38,16 @@ if (!hasSingleInstanceLock) app.quit();
 let utilityWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let overlayWindow: BrowserWindow | null = null;
-let captureWindow: BrowserWindow | null = null;
 let captureCoordinator: CaptureCoordinator | null = null;
 let regionSelector: RegionSelector | null = null;
 let durableSettings: DurableSettings;
 let state: ControlState;
 let settingsStore: SettingsStore;
 let shortcutManager: ShortcutManager;
-let metadataClient: Win32MetadataClient;
+let metadataClient: NativeCaptureClient;
 let quitting = false;
 let smokeEvidenceWritten = false;
+let smokeFramePath: string | null = null;
 
 function broadcastState() {
   for (const window of [utilityWindow, settingsWindow]) {
@@ -72,6 +74,13 @@ function writeSmokeEvidence(force = false): void {
     !captureCoordinator
   ) return;
   smokeEvidenceWritten = true;
+  const frame = captureCoordinator.getLatestFrame();
+  if (frame && state.captureProbe.frameCount >= 2 && overlayWindow?.isVisible() && !smokeFramePath && process.env.ROSECR_CAPTURE_SAVE_FRAME === '1') {
+    const directory = path.join(app.getPath('pictures'), 'Screenshots');
+    fs.mkdirSync(directory, { recursive: true });
+    smokeFramePath = path.join(directory, `rosecr-native-${state.scope}-${randomUUID()}.png`);
+    fs.writeFileSync(smokeFramePath, nativeImage.createFromBitmap(frame.pixels, { width: frame.width, height: frame.height, scaleFactor: 1 }).toPNG());
+  }
   const ownWindowNames = BrowserWindow.getAllWindows().map((window) => window.getTitle());
   const evidence = {
     recordedAt: new Date().toISOString(),
@@ -83,6 +92,12 @@ function writeSmokeEvidence(force = false): void {
     status: { state: state.status, message: state.statusMessage },
     runtime: state.captureProbe,
     geometry: captureCoordinator.getEvidence(),
+    native: metadataClient.getDiagnostics(),
+    capturedFramePath: smokeFramePath,
+    frame: frame ? { target: frame.target, captureGeneration: frame.captureGeneration, sessionEpoch: frame.sessionEpoch,
+      sequence: frame.sequence, qpcTimestamp100ns: frame.qpcTimestamp100ns, timestamp: frame.timestamp,
+      clientRect: frame.clientRect, dpi: frame.dpi, cropOrigin: frame.cropOrigin,
+      width: frame.width, height: frame.height, stride: frame.stride, payloadBytes: frame.payloadBytes, grabLatencyMs: frame.grabLatencyMs } : null,
     overlay: {
       focusable: overlayWindow?.isFocusable(),
       contentProtected: overlayWindow?.isContentProtected(),
@@ -296,16 +311,6 @@ function createWindows(): void {
   protectWindow(overlayWindow);
   overlayWindow.loadFile(path.join(__dirname, '..', 'renderer', 'overlay.html'));
 
-  captureWindow = new BrowserWindow({
-    show: false,
-    webPreferences: secureWebPreferences(path.join(__dirname, '..', 'preload', 'capture-preload.js'), {
-      partition: 'rosecr-capture',
-      backgroundThrottling: false
-    })
-  });
-  protectWindow(captureWindow);
-  captureWindow.loadFile(path.join(__dirname, '..', 'renderer', 'capture-worker.html'));
-
   regionSelector = new RegionSelector(() => {
     const selectorWindow = new BrowserWindow({
       show: false,
@@ -329,14 +334,13 @@ function createWindows(): void {
   });
 
   captureCoordinator = new CaptureCoordinator({
-    captureWindow,
+    frameSource: metadataClient,
     overlayWindow,
     metadataClient,
     catalog: { listTargets: listCaptureTargets },
     screen,
     getState: () => state,
     updateState,
-    workerStopChannel: IPC.captureWorkerStop,
     onGeometryChanged: () => writeSmokeEvidence(true)
   });
 }
@@ -361,15 +365,14 @@ function registerIpc(): void {
     updateState((current) => reduceControlState(current, { type: 'set-auto', enabled: false }));
     return state;
   });
-  ipcMain.on(IPC.captureWorkerReport, (event, report) => {
-    if (event.sender !== captureWindow?.webContents) return;
-    captureCoordinator?.handleWorkerReport(report as CaptureWorkerReport);
-  });
 }
 
 async function runSmokeProbe(): Promise<void> {
   const targetTitle = process.env.ROSECR_CAPTURE_TARGET;
   if (!targetTitle) return;
+  if (process.env.ROSECR_CAPTURE_CONTENT_PROTECTION === '0') {
+    for (const window of BrowserWindow.getAllWindows()) window.setContentProtection(false);
+  }
   const evidencePath = process.env.ROSECR_CAPTURE_EVIDENCE;
   try {
     const writeStage = (stage: string): void => {
@@ -412,7 +415,7 @@ async function runSmokeProbe(): Promise<void> {
 if (hasSingleInstanceLock) {
   app.whenReady().then(() => {
     settingsStore = new SettingsStore(app.getPath('userData'));
-    metadataClient = new Win32MetadataClient(app.getAppPath());
+    metadataClient = new NativeCaptureClient(nativeHelperPath(app.getAppPath(), app.isPackaged ? process.resourcesPath : undefined));
     durableSettings = settingsStore.load();
     state = createInitialState(durableSettings);
     createWindows();
@@ -430,7 +433,7 @@ if (hasSingleInstanceLock) {
   app.on('before-quit', () => {
     quitting = true;
     regionSelector?.cancel();
-    captureCoordinator?.stop();
+    captureCoordinator?.dispose();
   });
 
   app.on('will-quit', () => {

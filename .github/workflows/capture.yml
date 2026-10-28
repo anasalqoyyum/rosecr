@@ -1,0 +1,56 @@
+name: Capture validation
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  portable:
+    name: Portable checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm run build
+      - run: cargo fetch --locked --target x86_64-unknown-linux-gnu --manifest-path native/capture-helper/Cargo.toml
+      - run: cargo fmt --manifest-path native/capture-helper/Cargo.toml -- --check
+      - run: cargo test --locked --offline --manifest-path native/capture-helper/Cargo.toml
+
+  windows:
+    name: Windows x64 build and tests
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: cargo fetch --locked --target x86_64-pc-windows-msvc --manifest-path native/capture-helper/Cargo.toml
+      - run: cargo test --locked --offline --target x86_64-pc-windows-msvc --manifest-path native/capture-helper/Cargo.toml
+      - run: pnpm run build:windows
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rosecr-capture-helper-windows-x64
+          path: dist/native/rosecr-capture-helper.exe
+          if-no-files-found: error

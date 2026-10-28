@@ -2,7 +2,6 @@ import type { BrowserWindow, Rectangle, Screen } from 'electron';
 import { regionToClientRect } from '../shared/region';
 import { CaptureHealth } from './capture-health';
 import {
-  type CaptureFrameReport,
   type CaptureTarget,
   type ControlState,
   attachedWindow,
@@ -15,7 +14,7 @@ import {
 } from './control-state';
 import { resolveGameWindow, type GameWindowCatalog, type TargetResolution } from './game-target';
 import { physicalClientRectToDip } from './geometry';
-import { Win32MetadataClient, type WindowMetadata } from './win32-metadata-client';
+import { TargetCaptureUnavailable, type CapturedFrame, type FrameSource, type FrameSourceEvent, type WindowMetadataSource, type WindowMetadata } from './native-capture-client';
 
 const USABLE_FRAME_DEADLINE_MS = 5000;
 // Listing every top-level window costs more than querying one handle, so a closed game is polled less often.
@@ -30,31 +29,29 @@ type TargetRecovery = 'poll-window' | 'find-game' | 'choose-window';
 type GeometryRefresh = 'ready' | 'closed' | 'failed';
 
 export type CaptureWorkerReport = { captureGeneration?: number } & (
-  | ({ kind: 'frame'; blank: boolean } & CaptureFrameReport)
+  | ({ kind: 'frame'; blank: boolean } & import('./control-state').CaptureFrameReport)
   | { kind: 'ended' | 'muted'; timestamp: number }
   | { kind: 'error'; message: string; timestamp: number });
 
 interface CaptureCoordinatorDependencies {
-  captureWindow: BrowserWindow;
-  overlayWindow: BrowserWindow;
-  metadataClient: Win32MetadataClient;
+  frameSource: FrameSource;
+  overlayWindow: Pick<BrowserWindow, 'hide' | 'showInactive' | 'isVisible' | 'setBounds'>;
+  metadataClient: Pick<WindowMetadataSource, 'query'>;
   catalog: GameWindowCatalog;
-  screen: Screen;
+  screen: Pick<Screen, 'screenToDipPoint'>;
   getState(): ControlState;
   updateState(updater: (state: ControlState) => ControlState): void;
-  workerStopChannel: string;
   onGeometryChanged?: () => void;
 }
 
 export class CaptureCoordinator {
-  private readonly captureWindow: BrowserWindow;
-  private readonly overlayWindow: BrowserWindow;
-  private readonly metadataClient: Win32MetadataClient;
+  private readonly frameSource: FrameSource;
+  private readonly overlayWindow: CaptureCoordinatorDependencies['overlayWindow'];
+  private readonly metadataClient: CaptureCoordinatorDependencies['metadataClient'];
   private readonly catalog: GameWindowCatalog;
-  private readonly screen: Screen;
+  private readonly screen: CaptureCoordinatorDependencies['screen'];
   private readonly getState: () => ControlState;
   private readonly updateState: (updater: (state: ControlState) => ControlState) => void;
-  private readonly workerStopChannel: string;
   private readonly onGeometryChanged: () => void;
   private readonly health = new CaptureHealth();
   private metadataTimer: NodeJS.Timeout | null = null;
@@ -63,22 +60,32 @@ export class CaptureCoordinator {
   private metadataQueryGeneration: number | null = null;
   private active = false;
   private outputClearGeneration = 0;
-  private geometryRefreshedAt = 0;
+  private frameTimer: NodeJS.Timeout | null = null;
+  private frameQueryGeneration: number | null = null;
+  private sessionEpoch = 0;
+  private deviceReady = false;
+  private lastSequence = 0;
+  private lastQpc = 0;
+  private minimumFrameQpc = 0;
+  private frameCount = 0;
+  private startedAt = 0;
+  private latestFrame: CapturedFrame | null = null;
+  private readonly unsubscribe: () => void;
   private overlayReady = false;
   private mode: 'one-shot' | 'continuous' = 'continuous';
   private lastMetadata: WindowMetadata | null = null;
   private lastDipBounds: Rectangle | null = null;
 
   constructor(dependencies: CaptureCoordinatorDependencies) {
-    this.captureWindow = dependencies.captureWindow;
+    this.frameSource = dependencies.frameSource;
     this.overlayWindow = dependencies.overlayWindow;
     this.metadataClient = dependencies.metadataClient;
     this.catalog = dependencies.catalog;
     this.screen = dependencies.screen;
     this.getState = dependencies.getState;
     this.updateState = dependencies.updateState;
-    this.workerStopChannel = dependencies.workerStopChannel;
     this.onGeometryChanged = dependencies.onGeometryChanged ?? (() => {});
+    this.unsubscribe = this.frameSource.subscribe((event) => this.handleSourceEvent(event));
   }
 
   async start(mode: 'one-shot' | 'continuous'): Promise<void> {
@@ -107,23 +114,30 @@ export class CaptureCoordinator {
     this.lastDipBounds = null;
     this.overlayWindow.hide();
     this.health.reset();
-    if (this.captureWindow.webContents.isLoading()) {
-      await new Promise<void>((resolve) => this.captureWindow.webContents.once('did-finish-load', () => resolve()));
-    }
     if (generation !== this.generation) return;
     const refresh = await this.refreshGeometry(target.nativeHandle, generation);
     // A handle kept from an earlier session may belong to a game that restarted since; look it up once.
     if (refresh === 'closed' && attached && mayReattach) return this.startCapture(mode, false);
     if (refresh !== 'ready') return;
-    this.usableFrameDeadline = setTimeout(() => this.waitForTarget('no usable frames from target'), USABLE_FRAME_DEADLINE_MS);
-    if (mode === 'continuous') this.metadataTimer = setInterval(() => void this.refreshGeometry(target.nativeHandle, generation), 200);
+    this.armFrameDeadline();
+    this.metadataTimer = setInterval(() => void this.refreshGeometry(target.nativeHandle, generation), 200);
+    this.startedAt = performance.now();
+    this.frameCount = 0;
+    this.lastSequence = 0;
+    this.lastQpc = 0;
+    this.sessionEpoch = 0;
+    this.minimumFrameQpc = 0;
+    this.deviceReady = true;
     try {
-      const report = await this.captureWindow.webContents.executeJavaScript(
-        `window.captureProbeRuntime.start(${JSON.stringify({ frameRate: 60, sourceId: target.id, captureGeneration: generation })})`
-      ) as CaptureWorkerReport | undefined;
-      if (generation === this.generation && report) this.handleWorkerReport(report);
+      const session = await this.frameSource.start(target, generation);
+      if (generation !== this.generation) return;
+      this.sessionEpoch = Math.max(this.sessionEpoch, session.sessionEpoch);
+      this.frameTimer = setInterval(() => void this.grabFrame(generation), 250);
+      await this.grabFrame(generation);
     } catch (error) {
-      if (generation === this.generation) this.waitForTarget(error instanceof Error ? error.message : 'capture worker failed to start');
+      if (generation !== this.generation) return;
+      if (error instanceof TargetCaptureUnavailable) this.waitForTarget(error.message);
+      else this.fail(error);
     }
   }
 
@@ -134,8 +148,13 @@ export class CaptureCoordinator {
     this.metadataTimer = null;
     if (this.usableFrameDeadline) clearTimeout(this.usableFrameDeadline);
     this.usableFrameDeadline = null;
-    this.captureWindow.webContents.send(this.workerStopChannel);
-    void this.captureWindow.webContents.executeJavaScript('window.captureProbeRuntime?.stop()').catch(() => {});
+    if (this.frameTimer) clearInterval(this.frameTimer);
+    this.frameTimer = null;
+    if (clearOverlay) this.latestFrame = null;
+    const stoppedGeneration = this.generation;
+    void this.frameSource.stopCapture().catch((error: unknown) => {
+      if (stoppedGeneration === this.generation) this.updateState((state) => runtimeError(state, error instanceof Error ? error.message : 'native capture stop failed'));
+    });
     if (clearOverlay) {
       this.overlayReady = false;
       this.overlayWindow.hide();
@@ -187,8 +206,9 @@ export class CaptureCoordinator {
           this.lastDipBounds?.x !== bounds.x || this.lastDipBounds?.y !== bounds.y ||
           this.lastDipBounds?.width !== bounds.width || this.lastDipBounds?.height !== bounds.height) {
         this.overlayReady = false;
-        this.geometryRefreshedAt = Date.now();
+        this.latestFrame = null;
         this.overlayWindow.hide();
+        if (this.active) this.armFrameDeadline();
       }
       this.lastMetadata = metadata;
       this.lastDipBounds = bounds;
@@ -255,8 +275,8 @@ export class CaptureCoordinator {
     let resolution: TargetResolution;
     try {
       resolution = resolveGameWindow(saved, await this.catalog.listTargets());
-    } catch {
-      // The game is already unavailable, so a failed listing is another miss; Auto keeps waiting.
+    } catch (error) {
+      if (generation === this.generation) this.fail(error);
       return;
     } finally {
       if (this.metadataQueryGeneration === generation) this.metadataQueryGeneration = null;
@@ -289,36 +309,82 @@ export class CaptureCoordinator {
     }
   }
 
-  handleWorkerReport(report: CaptureWorkerReport): void {
-    if (!this.active || report.captureGeneration !== this.generation) return;
-    if (report.kind === 'frame') {
-      const rect = this.lastMetadata?.clientRect;
-      if (!rect || report.timestamp < this.geometryRefreshedAt) return;
-      // Electron frames and Win32 client bounds can differ by one physical pixel.
-      if (Math.abs(report.width - (rect.right - rect.left)) > 1 ||
-          Math.abs(report.height - (rect.bottom - rect.top)) > 1) return;
-      const health = this.health.assess(report);
-      if (!health.valid) {
-        this.waitForTarget(health.reason);
-        return;
-      }
-      if (this.mode === 'one-shot' && report.blank) return;
-      if (this.usableFrameDeadline) clearTimeout(this.usableFrameDeadline);
-      this.usableFrameDeadline = null;
-      this.overlayReady = this.getState().clearGeneration === this.outputClearGeneration;
-      if (this.overlayReady && this.getState().overlayVisible && !this.overlayWindow.isVisible()) this.overlayWindow.showInactive();
-      this.updateState((state) => captureFrameReported(state, report, this.mode));
-      if (this.mode === 'one-shot') this.stop(false);
-      return;
-    }
-    if (report.kind === 'ended' || report.kind === 'muted') {
-      this.waitForTarget('capture stream stopped');
-      return;
-    }
-    if (report.kind === 'error') {
-      this.waitForTarget(report.message || 'capture failed');
+  private async grabFrame(generation: number): Promise<void> {
+    if (!this.active || generation !== this.generation || this.frameQueryGeneration === generation) return;
+    this.frameQueryGeneration = generation;
+    const { scope, region } = this.getState();
+    try {
+      const frame = await this.frameSource.grab(scope === 'region' ? region : null);
+      if (frame && generation === this.generation) this.handleFrame(frame);
+    } catch (error) {
+      if (generation === this.generation) this.fail(error);
+    } finally {
+      if (this.frameQueryGeneration === generation) this.frameQueryGeneration = null;
     }
   }
+
+  handleSourceEvent(event: FrameSourceEvent): void {
+    if (event.kind === 'failure') { this.fail(event.error); return; }
+    if (!this.active || event.captureGeneration !== this.generation || event.target !== attachedWindow(this.getState())?.nativeHandle || event.sessionEpoch < this.sessionEpoch) return;
+    if (event.sessionEpoch > this.sessionEpoch) {
+      this.sessionEpoch = event.sessionEpoch;
+      this.lastSequence = 0;
+      this.lastQpc = 0;
+    }
+    this.overlayReady = false;
+    this.latestFrame = null;
+    this.overlayWindow.hide();
+    if (event.event === 'geometryChanged' || event.event === 'deviceRecovered') this.minimumFrameQpc = Math.max(this.minimumFrameQpc, event.qpcTimestamp100ns);
+    if (event.event === 'deviceLost') this.deviceReady = false;
+    if (event.event === 'deviceRecovered') this.deviceReady = true;
+    if (event.event === 'geometryChanged' || event.event === 'deviceLost' || event.event === 'deviceRecovered') {
+      this.armFrameDeadline();
+      return;
+    }
+    this.waitForTarget(event.message || event.event, event.event === 'closed' ? 'find-game' : 'poll-window');
+  }
+
+  private armFrameDeadline(): void {
+    if (this.usableFrameDeadline) clearTimeout(this.usableFrameDeadline);
+    this.usableFrameDeadline = setTimeout(() => this.waitForTarget('no usable frames from target'), USABLE_FRAME_DEADLINE_MS);
+  }
+
+  handleFrame(frame: CapturedFrame): void {
+    if (!this.active || !this.deviceReady || frame.captureGeneration !== this.generation || frame.target !== attachedWindow(this.getState())?.nativeHandle ||
+        frame.sessionEpoch !== this.sessionEpoch || frame.sequence <= this.lastSequence || frame.qpcTimestamp100ns <= this.lastQpc || frame.qpcTimestamp100ns < this.minimumFrameQpc) return;
+    const metadata = this.lastMetadata;
+    const client = metadata?.clientRect;
+    if (!client || !metadata || metadata.dpi !== frame.dpi || !sameRect(client, frame.clientRect)) return;
+    const { scope, region } = this.getState();
+    const crop = scope === 'region' && region ? regionToClientRect(region, client) : client;
+    if (frame.cropOrigin.x !== crop.left - client.left || frame.cropOrigin.y !== crop.top - client.top ||
+        frame.width !== crop.right - crop.left || frame.height !== crop.bottom - crop.top) return;
+    this.lastSequence = frame.sequence;
+    this.lastQpc = frame.qpcTimestamp100ns;
+    let blank = true;
+    for (let index = 0; index < frame.pixels.length; index += 4) {
+      if (frame.pixels[index] || frame.pixels[index + 1] || frame.pixels[index + 2]) { blank = false; break; }
+    }
+    const assessment = this.health.assess({ ...frame, blank });
+    if (!assessment.valid) { this.waitForTarget(assessment.reason); return; }
+    if (blank) { this.overlayReady = false; this.overlayWindow.hide(); return; }
+    this.latestFrame = frame;
+    this.frameCount++;
+    if (this.usableFrameDeadline) clearTimeout(this.usableFrameDeadline);
+    this.usableFrameDeadline = null;
+    if (this.mode === 'continuous') this.armFrameDeadline();
+    this.overlayReady = this.getState().clearGeneration === this.outputClearGeneration;
+    if (this.overlayReady && this.getState().overlayVisible && !this.overlayWindow.isVisible()) this.overlayWindow.showInactive();
+    this.updateState((state) => captureFrameReported(state, {
+      frameCount: this.frameCount, width: frame.width, height: frame.height, timestamp: frame.timestamp,
+      firstFrameLatencyMs: this.frameCount === 1 ? performance.now() - this.startedAt : undefined
+    }, this.mode));
+    if (this.mode === 'one-shot') this.stop(false);
+  }
+
+  getLatestFrame(): CapturedFrame | null { return this.latestFrame; }
+
+  dispose(): void { this.stop(); this.unsubscribe(); }
 
   setOverlayVisibility(visible: boolean): void {
     if (!visible) this.overlayWindow.hide();
@@ -335,4 +401,8 @@ function sameClientGeometry(previous: WindowMetadata, next: WindowMetadata): boo
   const b = next.clientRect;
   return next.capturable && previous.dpi === next.dpi && a !== null && b !== null &&
     a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
+}
+
+function sameRect(a: NonNullable<WindowMetadata['clientRect']>, b: NonNullable<WindowMetadata['clientRect']>): boolean {
+  return a.left === b.left && a.top === b.top && a.right === b.right && a.bottom === b.bottom;
 }

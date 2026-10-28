@@ -7,6 +7,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import type { ControlState } from '../src/main/control-state';
 import { cloneDefaults, type DurableSettings } from '../src/main/settings-store';
+import { regionToClientRect } from '../src/shared/region';
 import { IPC } from '../src/shared/contracts';
 
 function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
@@ -39,23 +40,9 @@ function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
     webContents = {
       send: (channel: string, state?: ControlState) => {
         if (channel === IPC.stateChanged && state) this.broadcasts.push(state);
-        if (channel === IPC.captureWorkerStop && activeSource) stops.push(activeSource);
       },
       setWindowOpenHandler() {},
-      on() {},
-      isLoading: () => false,
-      executeJavaScript: async (script: string) => {
-        if (!script.startsWith('window.captureProbeRuntime.start(')) {
-          activeSource = null;
-          return;
-        }
-        starts.push(script);
-        const match = /"sourceId":"([^"]+)"/.exec(script);
-        assert.ok(match);
-        activeSource = match[1];
-        await options.workerGate;
-        return { kind: 'frame', captureGeneration: JSON.parse(script.slice(script.indexOf('(') + 1, -1)).captureGeneration, blank: false, frameCount: 1, width: 800, height: 600, timestamp: Date.now() };
-      }
+      on() {}
     };
     constructor() { windows.push(this); }
     loadFile() {}
@@ -122,16 +109,39 @@ function loadMain(hasLock = true, queryGate?: Promise<void>, options: {
             save(settings: DurableSettings) { saves.push(structuredClone(settings)); }
           }
         };
-        case './win32-metadata-client': return {
-          Win32MetadataClient: class {
+        case './native-capture-client': return {
+          nativeHelperPath: () => 'helper.exe',
+          NativeCaptureClient: class {
+            generation = 0;
+            subscribe() { return () => {}; }
+            async start(target: { id: string; nativeHandle: string }, generation: number) {
+              this.generation = generation;
+              activeSource = target.id;
+              starts.push(JSON.stringify({ sourceId: target.id, captureGeneration: generation }));
+              return { target: target.nativeHandle, captureGeneration: generation, sessionEpoch: 1 };
+            }
+            async stopCapture() { if (activeSource) stops.push(activeSource); activeSource = null; }
+            stop() {}
+            getDiagnostics() { return {}; }
+            async grab(region: Parameters<typeof regionToClientRect>[0] | null) {
+              const generation = this.generation;
+              const source = activeSource;
+              await options.workerGate;
+              const clientRect = { left: 0, top: 0, right: 800, bottom: 600 };
+              const crop = region ? regionToClientRect(region, clientRect) : clientRect;
+              const width = crop.right - crop.left; const height = crop.bottom - crop.top;
+              return { version: 1, kind: 'frame', target: source?.split(':')[1], captureGeneration: generation, sessionEpoch: 1,
+                sequence: 1, qpcTimestamp100ns: 100000, dpi: 96, clientRect, width, height,
+                cropOrigin: { x: crop.left, y: crop.top }, pixels: Buffer.alloc(width * height * 4, 255), timestamp: Date.now() };
+            }
             async list() {
               return { windows: (options.handles ?? [42, 43]).map((handle) => ({
-                handle: String(handle), title: 'Game', processId: -1, executableName: 'game.exe', className: 'GameWindow'
+                handle: String(handle), title: 'Game', processId: 7, executableName: 'game.exe', className: 'GameWindow'
               })) };
             }
             async query() {
               await queryGate;
-              return { exists: true, capturable: true, clientRect: { left: 0, top: 0, right: 800, bottom: 600 } };
+              return { exists: true, capturable: true, dpi: 96, clientRect: { left: 0, top: 0, right: 800, bottom: 600 } };
             }
           }
         };
@@ -159,7 +169,7 @@ test('Auto enabled before target selection starts capture and switching rebinds 
   const main = loadMain();
   t.after(() => main.dispose());
   await main.startup;
-  assert.equal(main.windows.length, 4);
+  assert.equal(main.windows.length, 3);
   assert.ok(main.shortcutRegistrations > 0);
   await main.invoke(IPC.command, { type: 'set-auto', enabled: true });
   assert.equal(main.starts.length, 0);
@@ -231,7 +241,7 @@ test('closing the controller quits even while hidden windows remain', async (t) 
   await main.startup;
   main.windows[0].events.get('closed')?.();
   assert.equal(main.quitCalls, 1);
-  assert.equal(main.windows.length, 4);
+  assert.equal(main.windows.length, 3);
   assert.doesNotThrow(() => main.listeners.get('second-instance')?.());
 });
 
@@ -303,7 +313,7 @@ test('a region drawn over the chosen game persists with the target and reconnect
   await main.invoke(IPC.selectTarget, 'window:42:0');
   const selecting = main.invoke(IPC.selectRegion);
   await new Promise<void>((resolve) => setImmediate(resolve));
-  const selector = main.windows[4];
+  const selector = main.windows[3];
   assert.ok(selector);
   assert.deepEqual(selector.bounds, { x: 0, y: 0, width: 800, height: 600 });
   const sender = { sender: selector.webContents };
@@ -366,6 +376,6 @@ test('choosing another game while the region request is pending discards that re
   await main.invoke(IPC.selectTarget, 'window:43:0');
   release();
   await assert.rejects(selecting, /game window changed/);
-  assert.equal(main.windows.length, 4, 'no selector opens over the previous game');
+  assert.equal(main.windows.length, 3, 'no selector opens over the previous game');
   assert.equal((await main.invoke(IPC.getState)).region, null);
 });
