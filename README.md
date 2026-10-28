@@ -26,6 +26,7 @@ Exclusive fullscreen, whole-desktop capture, manual inspect, dictionary cards, o
 - [Implementation milestones](docs/milestones.md)
 - [Vertical-slice todos](docs/todos/README.md)
 - [OCR sidecar](docs/ocr-sidecar.md)
+- [Native capture helper plan](docs/todos/TODO-021-native-windows-capture-helper.md)
 
 The PRD is authoritative when planning documents disagree.
 
@@ -44,4 +45,8 @@ pnpm start
 
 ## Status
 
-Milestone 0 is mostly complete. The Electron utility shell and executable Windows capture spike pass windowed and borderless game capture, target rejection, click-through input, movement, resizing, mixed-DPI and monitor changes, minimization, and target loss. The spike records that production requires a thin native Windows helper for explicit WGC lifecycle, metadata, and device-loss recovery. Captured-output exclusion, a live protected-target run, and device-loss evidence are still open.
+M0 tracking is closed. Its Electron utility shell and capture spike have recorded Windows evidence for windowed and borderless capture, target rejection, click-through input, movement, resizing, mixed-DPI and monitor changes, minimization, and target loss. Captured-output exclusion, a live protected-target run, and device-loss evidence remain open in [#9](https://github.com/anasalqoyyum/rosecr/issues/9).
+
+M1 is partially implemented. [PR #11](https://github.com/anasalqoyyum/rosecr/pull/11) added durable game targets and normalized regions; its Windows manual validation remains pending. [PR #12](https://github.com/anasalqoyyum/rosecr/pull/12) added the supervised RapidOCR sidecar, protocol tests, synthetic OCR fixtures, and recorded Windows benchmarks. The main application does not yet send live frames to that sidecar or render OCR boxes.
+
+The next capture slice is TODO-021: a native Windows helper that owns the WGC session and supplies pixels with matching geometry. TODO-004 then connects helper frames to local OCR and aligned debug overlays. Codex authentication, translation, and translated overlays are not implemented.

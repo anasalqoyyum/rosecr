@@ -24,12 +24,12 @@ The v1 target is a windowed or borderless-fullscreen game on Windows. Players ch
 
 ## Capabilities and Constraints
 
-- Planned v1 covers Japanese to English and English to Japanese, local OCR with `owocr` in a bundled Python sidecar, and Codex subscription sign-in through the pinned `@earendil-works/pi-ai` adapter.
+- Planned v1 covers Japanese to English and English to Japanese, local OCR with RapidOCR and PP-OCR models in a bundled Python sidecar, and Codex subscription sign-in through an exact-version `@earendil-works/pi-ai` adapter. The provider adapter is not installed yet.
 - The model and reasoning options come from the signed-in account. Rosecr does not promise a fixed model list.
 - Auto starts off and never resumes active after launch. Play performs one translation pass; Auto starts continuous change-driven work.
 - Rosecr does not inject into games, read game memory, install text hooks, patch executables, capture the whole desktop, or support exclusive fullscreen.
-- Current stage is M0. PR #2 provides an Electron utility shell and a harmless capture marker. OCR and translation are not implemented in this slice.
-- M1 adds durable local OCR. M2 adds the first Codex translation. Later milestones cover realtime quality, overlay productization, and release work.
+- M0 tracking is closed, with capture evidence still open in issue #9. PR #11 added durable game targets and normalized regions; Windows manual validation remains pending. PR #12 added the supervised RapidOCR sidecar with synthetic fixtures and recorded Windows benchmarks.
+- M1 remains incomplete. TODO-021 must deliver the native WGC frame source, and TODO-004 must connect it to OCR and aligned debug overlays. The application still renders a capture marker. M2 adds Codex authentication and the first translation; later milestones cover realtime quality, overlay productization, and release work.
 
 ## Brand Commitments
 
@@ -37,7 +37,7 @@ The project name is Rosecr. No approved logo, wordmark, or broader visual identi
 
 ## Evidence on Hand
 
-The PRD, [UI direction](docs/ui-direction.md), [wireframes](docs/wireframes.md), and [milestones](docs/milestones.md) define the planned product. [The local design foundation](docs/design-foundation.html) and [the Paper boards](https://app.paper.design/file/01M5SK8JB1SSBWD365703FBZP9) are design concepts. The HTML uses synthetic game, account, and session content and makes no capture or account calls. Treat it as a design proposal, not proof of shipped behavior.
+The PRD, [UI direction](docs/ui-direction.md), [wireframes](docs/wireframes.md), and [milestones](docs/milestones.md) define the planned product. [The local design foundation](docs/design-foundation.html) and [RoseCR Design Foundation in Doop](https://en.pipefish-sirius.ts.net:8443/c/tiv3OjhHpT) are design concepts. The HTML uses synthetic game, account, and session content and makes no capture or account calls. Treat it as a design proposal, not proof of shipped behavior. The [OCR sidecar record](docs/ocr-sidecar.md) separates completed sidecar work from pending live integration.
 
 ## Product Principles
 

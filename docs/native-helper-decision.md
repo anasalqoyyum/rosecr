@@ -4,7 +4,7 @@
 
 The native helper delivers frames. It owns the Windows.Graphics.Capture (WGC) session for the selected window and also replaces the PowerShell metadata probe. TODO-004 builds on helper frames, not Electron frames. Electron keeps the controller, settings, and overlay windows. The `getUserMedia` capture worker remains a development probe and is removed from the production path.
 
-Status: proposed, 2026-10-25. Needs a Windows spike before TODO-004 starts (see "Spike exit criteria").
+Frame ownership was selected in [PR #10](https://github.com/anasalqoyyum/rosecr/pull/10). The helper and its toolchain are not yet validated on Windows. [TODO-021](todos/TODO-021-native-windows-capture-helper.md) tracks implementation and the spike before TODO-004 integrates live capture. The standalone OCR sidecar portion of TODO-004 already merged in PR #12.
 
 ## Why a metadata-only helper doesn't work
 
@@ -53,7 +53,7 @@ Child process over private stdio. No sockets, matching the sidecar.
 The TypeScript side exposes two interfaces:
 
 - `WindowMetadataSource` with `list()` and `query(handle)`. The PowerShell shim already fits it. The TODO-003 thread can keep the shim behind it and swap in the helper later without a behaviour change.
-- `FrameSource` with `start(target, generation)`, `grab(region) -> { generation, physicalWidth, physicalHeight, clientRect, pixels }`, and an event stream. The owocr sidecar input (buffer, generation, physical dimensions) maps directly from `grab`.
+- `FrameSource` with `start(target, generation)`, `grab(region) -> { generation, physicalWidth, physicalHeight, clientRect, pixels }`, and an event stream. The RapidOCR sidecar input (buffer, generation, physical dimensions) maps directly from `grab`.
 
 ## Toolchain
 
@@ -64,12 +64,12 @@ Alternatives:
 - C++/WinRT. Microsoft's own capture samples use it and it produces the smallest exe. Manual memory safety, plus MSVC and CMake.
 - C# with NativeAOT. Ports the existing P/Invoke code from the PowerShell probe almost as-is. Larger exe, and NativeAOT must build on Windows.
 
-All three need Windows to run the spike. This WSL workspace can type-check and unit-test the TypeScript seam only.
+All three need Windows to run the spike. A Linux or WSL workspace can type-check and unit-test the TypeScript seam, but cannot validate native WGC behavior.
 
 ## Sequencing
 
-1. Spike on Windows (below). If it fails, revisit this record before TODO-004.
-2. New slice before TODO-004, or the first part of it: helper with `list`, `query`, `start`, `grab`, `closed`, and `deviceLost`. BGRA8 only. Remove the capture worker from the production path.
+1. Execute TODO-021's spike on Windows (below). If it fails, revisit this record before TODO-004 integrates live capture.
+2. TODO-021 delivers the helper with `list`, `query`, `start`, `grab`, `closed`, and `deviceLost`. BGRA8 only. Remove the capture worker from the production path.
 3. TODO-004 consumes `FrameSource`.
 4. TODO-007 adds HDR, display-topology invalidation, and reattach on top of the same helper, as its note already says.
 

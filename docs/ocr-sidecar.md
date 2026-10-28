@@ -140,7 +140,7 @@ To regenerate the fixtures, run `uv run --directory sidecar python tools/make_fi
 
 ## Remaining TODO-004 work
 
-For whoever wires live capture after `TODO-003` and the frame-source decision:
+For whoever wires live capture after `TODO-003` and [TODO-021's native helper](todos/TODO-021-native-windows-capture-helper.md). The frame-source decision is recorded; implementation and Windows proof are still pending:
 
 1. Own one `OcrSidecar` in the main process. Call `start()` when Play or Auto first needs OCR, not at app launch, so idle Rosecr spends nothing. Map its status into control state: `failed` becomes the actionable OCR error, and `starting` with `restart: true` becomes a waiting state. Leave capture configuration untouched in every case.
 2. Feed frames from the chosen capture source as `bgra8` crops in physical pixels, with the capture generation. Call `advanceGeneration()` whenever the capture coordinator's generation changes (target change, resize, DPI or display change), so in-flight results go stale before they can render.
