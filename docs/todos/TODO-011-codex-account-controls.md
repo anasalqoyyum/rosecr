@@ -1,28 +1,33 @@
-# TODO-011 Add Codex model, reasoning, account, and error controls
+# TODO-011 Add Kenari model, reasoning, account, and error controls
 
 ## Tags
 
 - `prd`
 - `vertical-slice`
 - `prd:desktop-ocr-translator-prd`
-- `codex`
+- `kenari`
 - `auth`
 
 ## Parent PRD
 
-`desktop-ocr-translator-prd.md`
+`desktop-ocr-translator-prd.md` is authoritative.
 
 ## What to build
 
-Turn the first Codex path into a self-serve account surface that reports the signed-in account, lists supported models and reasoning efforts, tests readiness, explains failures, and signs out without exposing credentials.
+Add production settings for the Kenari account/plan path after the synthetic proof and one-shot integration. Let the user configure or remove their `kn-` key, select a model, confirm that their plan covers it, inspect reported capabilities, explicitly test readiness, and understand failures without exposing credentials.
+
+The full settings UI is deferred from the synthetic probe in issue #4. That probe needs only explicit model selection and plan confirmation for synthetic text; it does not establish that these production controls exist.
 
 ## Acceptance criteria
 
-- [ ] Settings show non-secret Codex account state and only models and reasoning values reported for that account.
-- [ ] Low reasoning is the fresh default, and Rosecr never silently changes an unavailable selected model or reasoning effort.
-- [ ] Auth, workspace, unsupported-model, transport, and allowance failures map to distinct actionable states while capture configuration remains intact.
-- [ ] Sign-out clears provider sessions, translation context, glossary, and cache but not game or region presets.
-- [ ] Raw OAuth credentials remain in the main process and never appear in logs, renderer IPC, or ordinary settings.
+- [ ] Settings show non-secret Kenari configuration/account state. Use account-scoped provider reports for model access and capabilities when available; a static global catalog cannot establish what this account can use.
+- [ ] If account discovery is unavailable, the user can explicitly select a model and confirm plan coverage without Rosecr inventing account metadata or supported options. Readiness reports what was checked and what remains unknown.
+- [ ] The user confirms plan coverage for the exact selected model before a request. Key/account or model changes invalidate that confirmation. Key validity, model visibility, and a successful response do not establish billing coverage.
+- [ ] Reasoning choices appear only when reported for the selected account/model. Low reasoning is the fresh default only when supported; omit the parameter when unsupported or unknown. Never silently replace an unavailable selected model or reasoning effort.
+- [ ] Invalid-key, plan/access, unsupported-model or option, transport, and allowance failures map to distinct actionable states when the provider supplies enough information. Unknown failures stay unknown, and capture configuration remains intact.
+- [ ] Removing or replacing the key cancels active requests, disables Auto, and clears account-bound provider state, plan confirmation, translation context, glossary, and cache while preserving game and region presets.
+- [ ] The key stays in OS-protected main-process storage and never appears in logs, renderer IPC, diagnostic exports, or ordinary settings. Requests use built-in `fetch`; there is no Codex OAuth or Platform API-key fallback.
+- [ ] Readiness checks send only fixed synthetic text after explicit user action and selected-model plan confirmation. Opening settings or restoring configuration never starts cloud translation.
 
 ## Blocked by
 
@@ -41,4 +46,4 @@ Turn the first Codex path into a self-serve account surface that reports the sig
 
 ## Notes
 
-Do not show fabricated allowance estimates. Surface usage information only when `pi-ai` or the provider reports it.
+Show usage information only when Kenari reports it for the configured account. Do not fabricate allowance estimates or infer plan coverage from a catalog or a successful probe. Tools, screenshots, and user game text remain excluded from readiness probes. Batching, cache, and glossary behavior belong to later production integration under the PRD. The existing filename is retained for references.
