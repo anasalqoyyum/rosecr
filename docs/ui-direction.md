@@ -52,7 +52,7 @@ Translations should feel integrated into the game rather than presented in a sep
 - Anchor each translation to its OCR box.
 - Obscure translated source text with a current blurred crop or a neutral plate.
 - Preserve target-language UI, numbers, symbols, and non-linguistic content.
-- Wrap, expand, or reposition before shrinking.
+- Resolve collisions in PRD order: wrap at the source anchor, shrink only to the readable minimum, expand into free space, reposition within the game bounds, then use an edge callout.
 - Never silently truncate or overlap translations.
 - Use an edge callout only when no readable in-place layout exists.
 - Keep the previous valid translation dimmed while an update is pending.

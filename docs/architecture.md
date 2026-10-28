@@ -25,12 +25,15 @@ Rosecr does not inject code, read game memory, install text hooks, patch executa
 
 ## Runtime Shape
 
-Rosecr has two runtimes:
+The planned production application has three runtime components:
 
 1. Electron desktop application
-2. Bundled Python OCR sidecar
+2. Bundled native Windows capture helper
+3. Bundled Python OCR sidecar
 
-Electron owns orchestration, capture, windows, state, translation, auth, secure storage, settings, diagnostics, and overlay composition.
+Electron owns orchestration, windows, state, translation, auth, secure storage, settings, diagnostics, and overlay composition.
+
+The native helper owns the WGC session, target metadata, pixel delivery, and capture lifecycle. TODO-021 implements its initial BGRA8 frame path before TODO-004 connects live OCR. TODO-007 extends the same backend for HDR and display recovery. See [the helper decision](native-helper-decision.md).
 
 Python owns image preprocessing, RapidOCR, OCR confidence and geometry, orientation, and Japanese reading-order cleanup.
 
@@ -74,7 +77,7 @@ Responsibilities:
 - Recover from target resize, DPI changes, display changes, and device loss.
 - Reject Rosecr-owned windows and invalid or blank frames.
 
-The first implementation slice must prove a window capture path compatible with `Windows.Graphics.Capture` semantics. Electron APIs are preferred when they satisfy the contract; otherwise a thin native Windows helper becomes v1 work.
+M0 proved Electron frame delivery and passive overlay behavior but found gaps in target metadata and explicit WGC lifecycle and device-loss recovery. Production therefore uses a native helper that owns the window capture session and delivers frames with their geometry snapshot. The Electron capture worker and PowerShell metadata probe remain development scaffolding until TODO-021 replaces them in the production path.
 
 Rosecr windows use capture exclusion through Electron content protection or the corresponding Windows display-affinity behavior. The Capture Engine also detects recursion rather than relying on exclusion alone.
 

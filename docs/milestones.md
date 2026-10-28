@@ -4,9 +4,11 @@ Parent PRD: `desktop-ocr-translator-prd.md`
 
 Shared tag: `prd:desktop-ocr-translator-prd`
 
-Milestones are ordered by risk and demoable value. A todo is complete only when its acceptance criteria and relevant tests pass.
+Milestones are ordered by risk and demoable value. A todo is complete only when its acceptance criteria and relevant tests pass. Merged implementation and pending live Windows validation are recorded separately; merging code does not satisfy an unexecuted acceptance criterion.
 
 ## M0 Safe Windows Foundation
+
+Tracking [#1](https://github.com/anasalqoyyum/rosecr/issues/1) is closed. The remaining TODO-002 evidence is tracked in [#9](https://github.com/anasalqoyyum/rosecr/issues/9): captured-output exclusion, a live protected target, and native WGC device-loss recovery. These remain required before release.
 
 Goal: prove the desktop and capture assumptions before building the translation pipeline.
 
@@ -25,16 +27,20 @@ Exit criteria:
 
 ## M1 Durable Local OCR Slice
 
+Tracking [#3](https://github.com/anasalqoyyum/rosecr/issues/3) remains open. PR #11 merged the target and region implementation, with Windows manual validation pending. PR #12 merged the supervised RapidOCR sidecar, synthetic fixtures, and recorded Windows benchmarks. Native capture is tracked in [#13](https://github.com/anasalqoyyum/rosecr/issues/13); live OCR/debug-overlay integration is not implemented.
+
 Goal: recognize a saved game region locally and recover cleanly from runtime or target-window failures.
 
 Slices:
 
 - `TODO-003` Persist a game target and normalized region
+- `TODO-021` Build and prove the native Windows capture helper
 - `TODO-004` Run supervised local OCR into aligned debug overlays
 
 Exit criteria:
 
 - A game and client-relative region can be selected, previewed, persisted, and reattached.
+- The native helper supplies BGRA8 frames with matching physical geometry and capture generations, and records the Windows evidence required by TODO-021 and issue #9.
 - The bundled Python sidecar communicates over typed stdio and restarts at most once after a crash, regaining the restart only after five minutes of healthy uptime.
 - RapidOCR returns positioned horizontal and vertical boxes with confidence.
 - OCR debug overlays stay aligned across movement, resizing, and DPI changes.

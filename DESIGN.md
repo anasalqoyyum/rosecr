@@ -119,7 +119,7 @@ components:
 
 Rosecr's proposed interface keeps the controller compact and settings shallow, leaving the game as the main view. Light utility surfaces use a muted rose action color. Translation uses a separate dark plate with bright text so it can sit over varied game imagery. Noto Sans and Noto Sans JP cover the two planned languages.
 
-This direction is captured in [the local design foundation](docs/design-foundation.html) and the [Paper boards](https://app.paper.design/file/01M5SK8JB1SSBWD365703FBZP9). It is a proposed v1 system, not a description of every shipped screen. M0 has an Electron shell and capture marker; it does not include OCR or translation.
+This direction is captured in [the local design foundation](docs/design-foundation.html) and [RoseCR Design Foundation in Doop](https://en.pipefish-sirius.ts.net:8443/c/tiv3OjhHpT). It is a proposed v1 system, not a description of every shipped screen. The shell, durable target and region implementation, and supervised RapidOCR sidecar are merged. Native capture, live OCR/debug-overlay integration, and Codex translation remain pending; the application still renders a capture marker.
 
 **Key Characteristics:**
 - Compact controls around a game-first experience.
@@ -217,7 +217,7 @@ The passive plate sits over the source box, uses the dark overlay colors, and ne
 - Do pair status colors with explicit text labels.
 - Do keep the source visible until the first complete translation is ready.
 - Do keep the last valid translation readable while an update is pending.
-- Do preserve all translated text and use a callout only after readable in-place layouts fail.
+- Do preserve all translated text and resolve collisions in PRD order: wrap, shrink to the readable minimum, expand, reposition, then use an edge callout.
 - Do reflow settings for resized desktop windows.
 
 ### Don't

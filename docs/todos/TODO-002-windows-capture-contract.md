@@ -18,6 +18,8 @@ Implement a narrow executable spike that captures one explicitly selected window
 
 ## Acceptance criteria
 
+M0 tracking issue #1 is closed. The unchecked evidence below remains open in [#9](https://github.com/anasalqoyyum/rosecr/issues/9). TODO-021 implements and proves the production helper; this spike's partial evidence must not be treated as full production validation.
+
 - [x] A windowed and borderless-fullscreen test target can produce frames without becoming the foreground window.
 - [ ] Rosecr-owned controller and overlay windows are rejected as targets and excluded from captured frames.
   - Target rejection is proven. Frame exclusion currently rests on content protection being enabled; captured output has not been inspected with Rosecr windows over the target.
@@ -43,4 +45,4 @@ Implement a narrow executable spike that captures one explicitly selected window
 
 ## Notes
 
-Do not inject into, read memory from, hook, patch, or elevate into the target. A native helper is acceptable only if the Electron path fails this contract.
+Do not inject into, read memory from, hook, patch, or elevate into the target. M0 found that Electron alone does not meet the production contract. [TODO-021](TODO-021-native-windows-capture-helper.md) owns the native WGC implementation; TODO-007 extends that backend later.

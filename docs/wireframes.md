@@ -225,7 +225,7 @@ Source C ───────┐   │   │      │ B  Complete translation�
                 └───┴───┘      └─────────────────────────────┘
 ```
 
-The edge callout is used only after wrapping, readable shrinking, expansion, and repositioning fail. Translation is never silently truncated.
+The PRD order is wrapping at the source anchor, shrinking only to the readable minimum, expansion into free space, repositioning within game bounds, then an edge callout. Translation is never silently truncated.
 
 ## Core Flows
 
